@@ -38,11 +38,11 @@ defmodule Ecto.Adapters.Mnesia.Record do
       (:inserted_at) ->
         params[:inserted_at] ||
           # TODO Repo#insert_all do not set timestamps, pickup Repo timestamps configuration
-          NaiveDateTime.utc_now()
+          :os.system_time(:millisecond)
       (:updated_at) ->
         params[:updated_at] ||
           # TODO Repo#insert_all do not set timestamps, pickup Repo timestamps configuration
-          NaiveDateTime.utc_now()
+          :os.system_time(:millisecond)
       (attribute) ->
         case Keyword.fetch(params, attribute) do
           {:ok, value} -> value
