@@ -53,8 +53,21 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
 
   @spec sort(list(%QueryExpr{}), %SelectExpr{}, list(tuple())) ::
           (query_handle :: :qlc.query_handle() -> query_handle :: :qlc.query_handle())
-  def sort([], _select, _sources) do
-    fn query -> query end
+  def sort([], select, sources) do
+    fn query ->
+      Enum.reduce(sources, query, fn ({table_name, source}, query1) ->
+        primary_keys = source.__schema__(:primary_key)
+        case primary_keys do
+          [] ->
+            Qlc.keysort(query1, 0, order: :ascending)
+          primary_keys ->
+            query2 = Enum.reduce(primary_keys, query1, fn (field, query2) ->
+              field_index = Table.record_field_index(field, table_name)
+              Qlc.keysort(query2, field_index, order: :ascending)
+            end)
+        end
+      end)
+    end
   end
 
   def sort(order_bys, select, sources) do

@@ -19,6 +19,7 @@ Mnesia is Distributed Database Management System shipped with Erlang runtime. Be
 - [ ] Sort by multiple fields
 - [x] One level joins
 - [ ] Deeper joins
+- [x] Bag tables with primary key
 
 2. Writing operations
 - [x] insert/insert_all

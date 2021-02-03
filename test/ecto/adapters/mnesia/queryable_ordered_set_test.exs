@@ -1,4 +1,4 @@
-defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
+defmodule Ecto.Adapters.MnesiaQueryableOrderedSetIntegrationTest do
   use ExUnit.Case, async: false
 
   import Ecto.Query, only: [from: 2]
@@ -11,7 +11,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
   defmodule TestSchema do
     use Ecto.Schema
 
-    schema "#{Ecto.Adapters.MnesiaQueryableIntegrationTest.Table}" do
+    schema "#{Ecto.Adapters.MnesiaQueryableOrderedSetIntegrationTest.Table}" do
       field(:field, :string)
     end
   end

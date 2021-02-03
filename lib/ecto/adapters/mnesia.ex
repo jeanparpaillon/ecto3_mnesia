@@ -44,7 +44,7 @@ defmodule Ecto.Adapters.Mnesia do
   ```
     defp deps do
       ...
-      {:ecto3_mnesia, "~> 0.1.0"}, # not released yet
+      {:ecto3_mnesia, "~> 0.2"}, # not released yet
       ...
     end
   ```
