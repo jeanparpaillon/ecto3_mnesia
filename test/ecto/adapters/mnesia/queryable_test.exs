@@ -423,6 +423,50 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
+    test "#delete_all from one table, records" do
+      records = [
+        %TestSchema{id: 1, field: "field 1"},
+        %TestSchema{id: 2, field: "field 2"},
+        %TestSchema{id: 3, field: "field 3"}
+      ]
+
+      {:atomic, _result} =
+        :mnesia.transaction(fn ->
+          Enum.map(records, fn %{id: id, field: field} ->
+            :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+          end)
+        end)
+
+      case TestRepo.delete_all(TestSchema) do
+        {count, nil} ->
+          assert count == 3
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    test "#delete_all from one table select query, records" do
+      records = [
+        %TestSchema{id: 1, field: "field 1"},
+        %TestSchema{id: 2, field: "field 2"},
+        %TestSchema{id: 3, field: "field 3"}
+      ]
+
+      {:atomic, _result} =
+        :mnesia.transaction(fn ->
+          Enum.map(records, fn %{id: id, field: field} ->
+            :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+          end)
+        end)
+
+      case TestRepo.delete_all(from(t in TestSchema, select: t.id)) do
+        {3, [1, 2, 3]} ->
+          assert true
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
     test "#delete_all from one table with simple where query, records" do
       records = [
         %TestSchema{id: 1, field: "field 1"},
