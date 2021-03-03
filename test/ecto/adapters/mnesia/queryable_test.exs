@@ -445,7 +445,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
-    test "#delete_all from one table select query, records" do
+    test "#delete_all from one table select with primary key query, records" do
       records = [
         %TestSchema{id: 1, field: "field 1"},
         %TestSchema{id: 2, field: "field 2"},
