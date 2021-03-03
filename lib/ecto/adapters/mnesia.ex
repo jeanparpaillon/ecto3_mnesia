@@ -213,6 +213,7 @@ defmodule Ecto.Adapters.Mnesia do
         _query_meta,
         {:nocache,
          %Mnesia.Query{
+           original: original,
            type: :delete_all,
            sources: sources,
            query: query,
@@ -231,13 +232,18 @@ defmodule Ecto.Adapters.Mnesia do
              |> Enum.map(&Tuple.to_list(&1))
              |> Enum.map(fn record ->
                :mnesia.delete(table_name, List.first(record), :write)
+               record
              end)
            end
          ]) do
-      {time, {:atomic, result}} ->
+      {time, {:atomic, records}} ->
         Logger.debug("QUERY OK sources=#{inspect(sources)} type=delete_all db=#{time}µs")
 
-        {length(result), nil}
+        result = case original.select do
+          nil -> nil
+          %Ecto.Query.SelectExpr{} -> records
+        end
+        {length(records), result}
 
       {time, {:aborted, error}} ->
         Logger.debug(

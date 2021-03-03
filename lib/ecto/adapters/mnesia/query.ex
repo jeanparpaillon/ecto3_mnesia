@@ -9,7 +9,8 @@ defmodule Ecto.Adapters.Mnesia.Query do
   alias Ecto.Query.QueryExpr
   require Qlc
 
-  defstruct type: nil,
+  defstruct original: nil,
+            type: nil,
             sources: nil,
             query: nil,
             sort: nil,
@@ -17,6 +18,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
             new_record: nil
 
   @type t :: %__MODULE__{
+          original: Ecto.Query.t(),
           type: :all | :update_all | :delete_all,
           sources: Keyword.t(),
           query: (params :: list() -> query_handle :: :qlc.query_handle()),
@@ -38,7 +40,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
           order_bys: order_bys,
           limit: limit,
           offset: offset
-        }
+        } = original
       ) do
     sources = sources(sources)
     query = Mnesia.Qlc.query(select, joins, sources).(wheres)
@@ -47,6 +49,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
     new_record = new_record(Enum.at(sources, 0), updates)
 
     %Mnesia.Query{
+      original: original,
       type: type,
       sources: sources,
       query: query,

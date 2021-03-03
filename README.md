@@ -86,6 +86,10 @@ defmodule MyApp.Context.Schema do
 end
 ```
 
+## Known issues
+- This package makes not a great usage of indices (https://gitlab.com/patatoid/ecto3_mnesia/-/issues/6)
+- Delete queries using a select must include primary key (https://gitlab.com/patatoid/ecto3_mnesia/-/issues/9)
+
 ## Tests
 You can run the tests as any mix package running
 ```
