@@ -342,7 +342,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def insert_all(
-        _adapter_meta,
+        adapter_meta,
         %{schema: schema, source: source, autogenerate_id: autogenerate_id},
         _header,
         records,
@@ -358,7 +358,8 @@ defmodule Ecto.Adapters.Mnesia do
       autogenerate_id: autogenerate_id
     ]
 
-    case :timer.tc(:mnesia, :transaction, [
+    case :timer.tc(&mnesia_transaction_wrapper/2, [
+           adapter_meta,
            fn ->
              Enum.map(records, fn params ->
                record = Record.build(params, context)
@@ -403,7 +404,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def update(
-        _adapter_meta,
+        adapter_meta,
         %{schema: schema, source: source, autogenerate_id: autogenerate_id},
         params,
         filters,
@@ -423,13 +424,15 @@ defmodule Ecto.Adapters.Mnesia do
     query = Mnesia.Qlc.query(:all, [], [source]).(filters)
 
     with {selectTime, {:atomic, [attributes]}} <-
-           :timer.tc(:mnesia, :transaction, [
+           :timer.tc(&mnesia_transaction_wrapper/2, [
+             adapter_meta,
              fn ->
                query.(params) |> Mnesia.Qlc.answers(nil, nil).(context)
              end
            ]),
          {updateTime, {:atomic, update}} <-
-           :timer.tc(:mnesia, :transaction, [
+           :timer.tc(&mnesia_transaction_wrapper/2, [
+             adapter_meta,
              fn ->
                update =
                  List.zip([schema.__schema__(:fields), attributes])
@@ -471,7 +474,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def delete(
-        _adapter_meta,
+        adapter_meta,
         %{schema: schema, source: source},
         filters,
         _opts
@@ -482,7 +485,8 @@ defmodule Ecto.Adapters.Mnesia do
     query = Mnesia.Qlc.query(:all, [], [source]).(filters)
 
     with {selectTime, {:atomic, [[id | _t]]}} <-
-           :timer.tc(:mnesia, :transaction, [
+           :timer.tc(&mnesia_transaction_wrapper/2, [
+             adapter_meta,
              fn ->
                query.([])
                |> Mnesia.Qlc.answers(nil, nil).(params: [])
