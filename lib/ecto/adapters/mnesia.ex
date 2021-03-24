@@ -127,7 +127,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Queryable
   def execute(
-        _adapter_meta,
+        adapter_meta,
         _query_meta,
         {:nocache,
          %Mnesia.Query{
@@ -142,7 +142,8 @@ defmodule Ecto.Adapters.Mnesia do
       ) do
     context = [params: params]
 
-    case :timer.tc(:mnesia, :transaction, [
+    case :timer.tc(&mnesia_transaction_wrapper/2, [
+           adapter_meta,
            fn ->
              query.(params)
              |> sort.()
@@ -165,7 +166,7 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   def execute(
-        _adapter_meta,
+        adapter_meta,
         _query_meta,
         {:nocache,
          %Mnesia.Query{
@@ -181,7 +182,8 @@ defmodule Ecto.Adapters.Mnesia do
     {table_name, _schema} = Enum.at(sources, 0)
     context = [params: params]
 
-    case :timer.tc(:mnesia, :transaction, [
+    case :timer.tc(&mnesia_transaction_wrapper/2, [
+           adapter_meta,
            fn ->
              query.(params)
              |> answers.(context)
@@ -209,7 +211,7 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   def execute(
-        _adapter_meta,
+        adapter_meta,
         _query_meta,
         {:nocache,
          %Mnesia.Query{
@@ -225,7 +227,8 @@ defmodule Ecto.Adapters.Mnesia do
     {table_name, _schema} = Enum.at(sources, 0)
     context = [params: params]
 
-    case :timer.tc(:mnesia, :transaction, [
+    case :timer.tc(&mnesia_transaction_wrapper/2, [
+           adapter_meta,
            fn ->
              query.(params)
              |> answers.(context)
@@ -256,13 +259,15 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Queryable
   def stream(
-        _adapter_meta,
+        adapter_meta,
         _query_meta,
         {:nocache, %Mnesia.Query{query: query, answers: answers}},
         params,
         _opts
       ) do
-    case :mnesia.transaction(fn ->
+    case mnesia_transaction_wrapper(
+         adapter_meta,
+         fn ->
            query.(params)
            |> answers.()
            |> Enum.map(&Tuple.to_list(&1))
