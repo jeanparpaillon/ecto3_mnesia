@@ -127,7 +127,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Queryable
   def execute(
-        _adapter_meta,
+        adapter_meta,
         _query_meta,
         {:nocache,
          %Mnesia.Query{
@@ -142,7 +142,8 @@ defmodule Ecto.Adapters.Mnesia do
       ) do
     context = [params: params]
 
-    case :timer.tc(:mnesia, :transaction, [
+    case :timer.tc(&mnesia_transaction_wrapper/2, [
+           adapter_meta,
            fn ->
              query.(params)
              |> sort.()
@@ -165,7 +166,7 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   def execute(
-        _adapter_meta,
+        adapter_meta,
         _query_meta,
         {:nocache,
          %Mnesia.Query{
@@ -181,7 +182,8 @@ defmodule Ecto.Adapters.Mnesia do
     {table_name, _schema} = Enum.at(sources, 0)
     context = [params: params]
 
-    case :timer.tc(:mnesia, :transaction, [
+    case :timer.tc(&mnesia_transaction_wrapper/2, [
+           adapter_meta,
            fn ->
              query.(params)
              |> answers.(context)
@@ -209,7 +211,7 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   def execute(
-        _adapter_meta,
+        adapter_meta,
         _query_meta,
         {:nocache,
          %Mnesia.Query{
@@ -225,7 +227,8 @@ defmodule Ecto.Adapters.Mnesia do
     {table_name, _schema} = Enum.at(sources, 0)
     context = [params: params]
 
-    case :timer.tc(:mnesia, :transaction, [
+    case :timer.tc(&mnesia_transaction_wrapper/2, [
+           adapter_meta,
            fn ->
              query.(params)
              |> answers.(context)
@@ -256,13 +259,15 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Queryable
   def stream(
-        _adapter_meta,
+        adapter_meta,
         _query_meta,
         {:nocache, %Mnesia.Query{query: query, answers: answers}},
         params,
         _opts
       ) do
-    case :mnesia.transaction(fn ->
+    case mnesia_transaction_wrapper(
+         adapter_meta,
+         fn ->
            query.(params)
            |> answers.()
            |> Enum.map(&Tuple.to_list(&1))
@@ -284,7 +289,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def insert(
-        _adapter_meta,
+        adapter_meta,
         %{schema: schema, source: source, autogenerate_id: autogenerate_id},
         params,
         on_conflict,
@@ -302,7 +307,8 @@ defmodule Ecto.Adapters.Mnesia do
     record = Record.build(params, context)
     id = elem(record, 1)
 
-    case :timer.tc(:mnesia, :transaction, [
+    case :timer.tc(&mnesia_transaction_wrapper/2, [
+           adapter_meta,
            fn ->
              case on_conflict do
                {:raise, _, _} ->
@@ -341,7 +347,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def insert_all(
-        _adapter_meta,
+        adapter_meta,
         %{schema: schema, source: source, autogenerate_id: autogenerate_id},
         _header,
         records,
@@ -357,7 +363,8 @@ defmodule Ecto.Adapters.Mnesia do
       autogenerate_id: autogenerate_id
     ]
 
-    case :timer.tc(:mnesia, :transaction, [
+    case :timer.tc(&mnesia_transaction_wrapper/2, [
+           adapter_meta,
            fn ->
              Enum.map(records, fn params ->
                record = Record.build(params, context)
@@ -402,7 +409,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def update(
-        _adapter_meta,
+        adapter_meta,
         %{schema: schema, source: source, autogenerate_id: autogenerate_id},
         params,
         filters,
@@ -422,13 +429,15 @@ defmodule Ecto.Adapters.Mnesia do
     query = Mnesia.Qlc.query(:all, [], [source]).(filters)
 
     with {selectTime, {:atomic, [attributes]}} <-
-           :timer.tc(:mnesia, :transaction, [
+           :timer.tc(&mnesia_transaction_wrapper/2, [
+             adapter_meta,
              fn ->
                query.(params) |> Mnesia.Qlc.answers(nil, nil).(context)
              end
            ]),
          {updateTime, {:atomic, update}} <-
-           :timer.tc(:mnesia, :transaction, [
+           :timer.tc(&mnesia_transaction_wrapper/2, [
+             adapter_meta,
              fn ->
                update =
                  List.zip([schema.__schema__(:fields), attributes])
@@ -470,7 +479,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def delete(
-        _adapter_meta,
+        adapter_meta,
         %{schema: schema, source: source},
         filters,
         _opts
@@ -481,7 +490,8 @@ defmodule Ecto.Adapters.Mnesia do
     query = Mnesia.Qlc.query(:all, [], [source]).(filters)
 
     with {selectTime, {:atomic, [[id | _t]]}} <-
-           :timer.tc(:mnesia, :transaction, [
+           :timer.tc(&mnesia_transaction_wrapper/2, [
+             adapter_meta,
              fn ->
                query.([])
                |> Mnesia.Qlc.answers(nil, nil).(params: [])
@@ -566,6 +576,17 @@ defmodule Ecto.Adapters.Mnesia do
     case File.exists?(path) do
       true -> :up
       false -> :down
+    end
+  end
+
+  # Wraps a function and decides if executing it as part of an already existant transaction
+  # or wrapping it into a :mnesia.transaction block
+  defp mnesia_transaction_wrapper(meta, fun) do
+    case in_transaction?(meta) do
+      true ->
+        # mnesia atomic operations (write, etc) always end with :ok or interrupts with exceptions
+        {:atomic, fun.()}
+      false -> :mnesia.transaction(fun)
     end
   end
 end
