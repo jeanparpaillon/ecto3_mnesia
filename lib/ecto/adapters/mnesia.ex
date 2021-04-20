@@ -102,6 +102,8 @@ defmodule Ecto.Adapters.Mnesia do
 
   require Logger
 
+  @default_meta %{record_name: :schema}
+
   @impl Ecto.Adapter
   defmacro __before_compile__(_env), do: true
 
@@ -121,7 +123,8 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter
   def init(config \\ []) do
-    {:ok, Connection.child_spec(config), %{}}
+    meta = :ecto3_mnesia |> Application.get_env(:adapter, []) |> Enum.into(%{})
+    {:ok, Connection.child_spec(config), Map.merge(@default_meta, meta)}
   end
 
   @impl Ecto.Adapter
@@ -311,7 +314,8 @@ defmodule Ecto.Adapters.Mnesia do
     context = [
       table_name: table_name,
       schema: schema,
-      autogenerate_id: autogenerate_id
+      autogenerate_id: autogenerate_id,
+      meta: adapter_meta
     ]
 
     record = Record.build(params, context)
@@ -384,7 +388,8 @@ defmodule Ecto.Adapters.Mnesia do
     context = [
       table_name: table_name,
       schema: schema,
-      autogenerate_id: autogenerate_id
+      autogenerate_id: autogenerate_id,
+      meta: adapter_meta
     ]
 
     case :timer.tc(&mnesia_transaction_wrapper/2, [
@@ -447,7 +452,8 @@ defmodule Ecto.Adapters.Mnesia do
       table_name: table_name,
       schema: schema,
       autogenerate_id: autogenerate_id,
-      params: params
+      params: params,
+      meta: adapter_meta
     ]
 
     query = Mnesia.Qlc.query(:all, [], [source]).(filters)
