@@ -34,13 +34,13 @@ defmodule Ecto.Adapters.Mnesia.Record do
         %{record_name: resolver} when is_function(resolver, 1) -> resolver.(context[:schema])
       end
 
-    {key, _source, type} = context[:autogenerate_id] || {nil, nil, nil}
+    {key, source, type} = context[:autogenerate_id] || {nil, nil, nil}
 
     attributes(table_name)
     |> Enum.map(fn
       ^key ->
         params[key] ||
-          Mnesia.autogenerate(type)
+          Mnesia.autogenerate({source, type})
 
       :inserted_at ->
         # TODO Repo#insert_all do not set timestamps, pickup Repo timestamps configuration

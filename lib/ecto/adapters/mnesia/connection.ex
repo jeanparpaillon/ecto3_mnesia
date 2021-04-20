@@ -36,6 +36,8 @@ defmodule Ecto.Adapters.Mnesia.Connection do
 
   def id_seq_table_name, do: @id_seq_table_name
 
+  def id_seq(source), do: {@id_seq_table_name, source}
+
   def all(type, %Ecto.Query{} = query) do
     Mnesia.Query.from_ecto_query(type, query)
   end
