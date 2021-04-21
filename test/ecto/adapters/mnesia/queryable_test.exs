@@ -183,7 +183,8 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
-    test "#all from one table with simple where query on custom type, many records" do
+    @tag :skip
+    test "#get_by from one table with simple where query on custom type, many records" do
       {:atomic, _result} =
         :mnesia.transaction(fn ->
           Stream.iterate(0, &(&1 + 1))
