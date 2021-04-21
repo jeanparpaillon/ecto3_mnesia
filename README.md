@@ -89,6 +89,9 @@ end
 ## Known issues
 - This package makes not a great usage of indices (https://gitlab.com/patatoid/ecto3_mnesia/-/issues/6)
 - Delete queries using a select must include primary key (https://gitlab.com/patatoid/ecto3_mnesia/-/issues/9)
+- Ecto 3.6 has introduced the possibility to send `placeholders` when using
+  `Repo.insert_all` (see https://github.com/elixir-ecto/ecto_sql/pull/290).
+  `placeholders` are not supported yet.
 
 ## Tests
 You can run the tests as any mix package running
