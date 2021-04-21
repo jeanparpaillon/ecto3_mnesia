@@ -14,6 +14,13 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     defstruct sources: [], params: [], qualifiers: [], joins: [], bindings: [], index: 0
 
     def new(%{sources: _, params: _} = args), do: struct(__MODULE__, args)
+
+    def add_binding(context, {field, source}, value) do
+      erl_var = Record.Attributes.to_erl_var(field, source)
+      bind_var = :"B#{context.index}_#{erl_var}"
+      bindings = [{bind_var, value} | context.bindings]
+      {erl_var, bind_var, %{context | index: context.index + 1, bindings: bindings}}
+    end
   end
 
   @order_mapping %{
@@ -187,8 +194,8 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   defp to_qlc(true, context), do: {"true", context}
 
   defp to_qlc({field, value}, %{sources: [source]} = context) do
-    erl_var = Record.Attributes.to_erl_var(field, source)
-    {"#{erl_var} == #{to_erl(value)}", context}
+    {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, value)
+    {"#{erl_var} == #{bind_var}", context}
   end
 
   defp to_qlc(
@@ -238,8 +245,8 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
        )
        when is_list(values) do
     source = Enum.at(context.sources, source_index)
-    erl_var = Record.Attributes.to_erl_var(field, source)
-    {"lists:member(#{erl_var}, [#{to_erl(values) |> Enum.join(", ")}])", context}
+    {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, values)
+    {"lists:member(#{erl_var}, #{bind_var})", context}
   end
 
   defp to_qlc(
@@ -270,9 +277,8 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
          context
        ) do
     source = Enum.at(context.sources, source_index)
-    erl_var = Record.Attributes.to_erl_var(field, source)
-    value = to_erl(value)
-    {"#{erl_var} =/= #{value}", context}
+    {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, value)
+    {"#{erl_var} =/= #{bind_var}", context}
   end
 
   defp to_qlc(
@@ -280,12 +286,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
          context
        ) do
     source = Enum.at(context.sources, source_index)
-    erl_var = Record.Attributes.to_erl_var(field, source)
-    value = to_erl(value)
-    {"#{erl_var} #{op} #{value}", context}
+    {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, value)
+    {"#{erl_var} #{op} #{bind_var}", context}
   end
-
-  defp to_erl(values) when is_list(values), do: Enum.map(values, &to_erl(&1))
-  defp to_erl(value) when is_binary(value), do: inspect(value, binaries: :as_binaries)
-  defp to_erl(value), do: value
 end

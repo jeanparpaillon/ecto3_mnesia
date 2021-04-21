@@ -183,7 +183,6 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
-    @tag :skip
     test "#get_by from one table with simple where query on custom type, many records" do
       {:atomic, _result} =
         :mnesia.transaction(fn ->
@@ -196,7 +195,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
 
       records = TestRepo.get_by(TestSchema2, field: "field 2")
 
-      assert [%{field: "field 2"}] = records
+      assert %{field: "field 2"} = records
 
       :mnesia.clear_table(@table_name2)
     end
