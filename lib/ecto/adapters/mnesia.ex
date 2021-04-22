@@ -89,6 +89,13 @@ defmodule Ecto.Adapters.Mnesia do
   @behaviour Ecto.Adapter.Storage
   @behaviour Ecto.Adapter.Transaction
 
+  case Application.load(:ecto) do
+    :ok -> :ok
+    {:error, {:already_loaded, _}} -> :ok
+  end
+
+  @ecto_vsn :ecto |> Application.spec(:vsn) |> to_string()
+
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Record
@@ -242,10 +249,12 @@ defmodule Ecto.Adapters.Mnesia do
       {time, {:atomic, records}} ->
         Logger.debug("QUERY OK sources=#{inspect(sources)} type=delete_all db=#{time}µs")
 
-        result = case original.select do
-          nil -> nil
-          %Ecto.Query.SelectExpr{} -> records
-        end
+        result =
+          case original.select do
+            nil -> nil
+            %Ecto.Query.SelectExpr{} -> records
+          end
+
         {length(records), result}
 
       {time, {:aborted, error}} ->
@@ -266,12 +275,13 @@ defmodule Ecto.Adapters.Mnesia do
         _opts
       ) do
     case mnesia_transaction_wrapper(
-         adapter_meta,
-         fn ->
-           query.(params)
-           |> answers.()
-           |> Enum.map(&Tuple.to_list(&1))
-         end) do
+           adapter_meta,
+           fn ->
+             query.(params)
+             |> answers.()
+             |> Enum.map(&Tuple.to_list(&1))
+           end
+         ) do
       {:atomic, result} ->
         result
 
@@ -346,6 +356,20 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   @impl Ecto.Adapter.Schema
+  if Version.compare(@ecto_vsn, "3.6.0") in [:eq, :gt] do
+    def insert_all(
+          adapter_meta,
+          schema,
+          header,
+          records,
+          on_conflict,
+          returning,
+          _placeholders,
+          opts
+        ),
+        do: insert_all(adapter_meta, schema, header, records, on_conflict, returning, opts)
+  end
+
   def insert_all(
         adapter_meta,
         %{schema: schema, source: source, autogenerate_id: autogenerate_id},
@@ -586,7 +610,9 @@ defmodule Ecto.Adapters.Mnesia do
       true ->
         # mnesia atomic operations (write, etc) always end with :ok or interrupts with exceptions
         {:atomic, fun.()}
-      false -> :mnesia.transaction(fun)
+
+      false ->
+        :mnesia.transaction(fun)
     end
   end
 end
