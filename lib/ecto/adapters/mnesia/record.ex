@@ -38,9 +38,9 @@ defmodule Ecto.Adapters.Mnesia.Record do
 
     attributes(table_name)
     |> Enum.map(fn
-      ^key ->
+      ^source ->
         params[key] ||
-          Mnesia.autogenerate({source, type})
+          Mnesia.autogenerate({{record_name, source}, type})
 
       :inserted_at ->
         # TODO Repo#insert_all do not set timestamps, pickup Repo timestamps configuration
