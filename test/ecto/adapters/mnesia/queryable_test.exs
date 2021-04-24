@@ -7,12 +7,33 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
   alias Ecto.Adapters.Mnesia
 
   @table_name __MODULE__.Table
+  @table_name2 __MODULE__.Table2
+
+  defmodule TestType.Charlist do
+    use Ecto.Type
+
+    def type, do: :list
+
+    def cast(s), do: {:ok, s}
+
+    def load(cl), do: {:ok, to_string(cl)}
+
+    def dump(s), do: {:ok, to_charlist(s)}
+  end
 
   defmodule TestSchema do
     use Ecto.Schema
 
     schema "#{Ecto.Adapters.MnesiaQueryableIntegrationTest.Table}" do
       field(:field, :string)
+    end
+  end
+
+  defmodule TestSchema2 do
+    use Ecto.Schema
+
+    schema "#{Ecto.Adapters.MnesiaQueryableIntegrationTest.Table2}" do
+      field(:field, TestType.Charlist)
     end
   end
 
@@ -31,7 +52,17 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       type: :ordered_set
     )
 
-    :mnesia.wait_for_tables([@table_name], 1000)
+    :mnesia.create_table(@table_name2,
+      ram_copies: [node()],
+      record_name: TestSchema2,
+      attributes: [:id, :field],
+      storage_properties: [
+        ets: [:compressed]
+      ],
+      type: :ordered_set
+    )
+
+    :mnesia.wait_for_tables([@table_name, @table_name2], 1000)
   end
 
   describe "Ecto.Adapter.Queryable#execute" do
@@ -150,6 +181,23 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
              end)
 
       :mnesia.clear_table(@table_name)
+    end
+
+    test "#get_by from one table with simple where query on custom type, many records" do
+      {:atomic, _result} =
+        :mnesia.transaction(fn ->
+          Stream.iterate(0, &(&1 + 1))
+          |> Enum.take(10_000)
+          |> Enum.map(fn id ->
+            :mnesia.write(@table_name2, {TestSchema2, id, 'field #{id}'}, :write)
+          end)
+        end)
+
+      records = TestRepo.get_by(TestSchema2, field: "field 2")
+
+      assert %{field: "field 2"} = records
+
+      :mnesia.clear_table(@table_name2)
     end
 
     test "#all from one table with complex (and) where query, records" do

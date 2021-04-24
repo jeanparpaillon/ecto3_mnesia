@@ -8,6 +8,21 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   alias Ecto.Query.QueryExpr
   alias Ecto.Query.SelectExpr
 
+  defmodule Context do
+    @moduledoc false
+
+    defstruct sources: [], params: [], qualifiers: [], joins: [], bindings: [], index: 0
+
+    def new(%{sources: _, params: _} = args), do: struct(__MODULE__, args)
+
+    def add_binding(context, {field, source}, value) do
+      erl_var = Record.Attributes.to_erl_var(field, source)
+      bind_var = :"B#{context.index}_#{erl_var}"
+      bindings = [{bind_var, value} | context.bindings]
+      {erl_var, bind_var, %{context | index: context.index + 1, bindings: bindings}}
+    end
+  end
+
   @order_mapping %{
     asc: :ascending,
     desc: :descending
@@ -21,32 +36,34 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     fn
       [%BooleanExpr{}] = wheres ->
         fn params ->
-          context = %{sources: sources, params: params}
-          qualifiers = qualifiers(wheres, context)
-
-          joins = joins(joins, context)
+          context =
+            %{sources: sources, params: params}
+            |> Context.new()
+            |> qualifiers(wheres)
+            |> joins(joins)
 
           comprehension =
-            [select, Enum.join(joins, ", "), Enum.join(qualifiers, ", ")]
+            [select, Enum.join(context.joins, ", "), Enum.join(context.qualifiers, ", ")]
             |> Enum.reject(fn component -> String.length(component) == 0 end)
             |> Enum.join(", ")
 
-          Qlc.q("[#{comprehension}]", [])
+          Qlc.q("[#{comprehension}]", context.bindings)
         end
 
       filters ->
         fn params ->
-          context = %{sources: sources, params: params}
-          qualifiers = qualifiers(filters, context)
-
-          joins = joins(joins, context)
+          context =
+            %{sources: sources, params: params}
+            |> Context.new()
+            |> qualifiers(filters)
+            |> joins(joins)
 
           comprehension =
-            [select, Enum.join(joins, ", "), Enum.join(qualifiers, ", ")]
+            [select, Enum.join(context.joins, ", "), Enum.join(context.qualifiers, ", ")]
             |> Enum.reject(fn component -> String.length(component) == 0 end)
             |> Enum.join(", ")
 
-          Qlc.q("[#{comprehension}]", [])
+          Qlc.q("[#{comprehension}]", context.bindings)
         end
     end
   end
@@ -137,19 +154,31 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     end
   end
 
-  defp qualifiers(wheres, context) do
-    wheres
-    |> Enum.map(fn
-      %BooleanExpr{expr: expr} -> expr
-      {field, value} -> {field, value}
-    end)
-    |> Enum.map(&to_qlc(&1, context))
+  defp qualifiers(context, wheres) do
+    context =
+      wheres
+      |> Enum.map(fn
+        %BooleanExpr{expr: expr} -> expr
+        {field, value} -> {field, value}
+      end)
+      |> Enum.reduce(context, fn where, acc ->
+        {qlc, acc} = to_qlc(where, acc)
+        %{acc | qualifiers: [qlc | acc.qualifiers]}
+      end)
+
+    %{context | qualifiers: Enum.reverse(context.qualifiers)}
   end
 
-  defp joins(joins, context) do
-    joins
-    |> Enum.map(fn %{on: %{expr: expr}} -> expr end)
-    |> Enum.map(&to_qlc(&1, context))
+  defp joins(context, joins) do
+    context =
+      joins
+      |> Enum.map(fn %{on: %{expr: expr}} -> expr end)
+      |> Enum.reduce(context, fn join, acc ->
+        {qlc, acc} = to_qlc(join, acc)
+        %{acc | joins: [qlc | acc.joins]}
+      end)
+
+    %{context | joins: Enum.reverse(context.joins)}
   end
 
   defp record_pattern(source) do
@@ -162,36 +191,43 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     |> List.insert_at(0, "Schema")
   end
 
-  defp to_qlc(true, _context), do: "true"
+  defp to_qlc(true, context), do: {"true", context}
 
-  defp to_qlc({field, value}, %{sources: [source]}) do
-    erl_var = Record.Attributes.to_erl_var(field, source)
-    "#{erl_var} == #{to_erl(value)}"
+  defp to_qlc({field, value}, %{sources: [source]} = context) do
+    {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, value)
+    {"#{erl_var} == #{bind_var}", context}
   end
 
   defp to_qlc(
          {:and, [], [a, b]},
          context
-       ),
-       do: "(#{to_qlc(a, context)} andalso #{to_qlc(b, context)})"
+       ) do
+    {a_qlc, context} = to_qlc(a, context)
+    {b_qlc, context} = to_qlc(b, context)
+    {"(#{a_qlc} andalso #{b_qlc})", context}
+  end
 
   defp to_qlc(
          {:or, [], [a, b]},
          context
-       ),
-       do: "(#{to_qlc(a, context)} orelse #{to_qlc(b, context)})"
+       ) do
+    {a_qlc, context} = to_qlc(a, context)
+    {b_qlc, context} = to_qlc(b, context)
+    {"(#{a_qlc} orelse #{b_qlc})", context}
+  end
 
   defp to_qlc(
          {:is_nil, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}]},
          context
        ) do
-    source = Enum.at(context[:sources], source_index)
+    source = Enum.at(context.sources, source_index)
     erl_var = Record.Attributes.to_erl_var(field, source)
-    "#{erl_var} == nil"
+    {"#{erl_var} == nil", context}
   end
 
   defp to_qlc({:not, [], [expr]}, context) do
-    "not (#{to_qlc(expr, context)})"
+    {expr_qlc, context} = to_qlc(expr, context)
+    {"not (#{expr_qlc})", context}
   end
 
   defp to_qlc(
@@ -199,7 +235,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
           [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, {:^, [], [index, length]}]},
          context
        ) do
-    values = Enum.slice(context[:params], index, length)
+    values = Enum.slice(context.params, index, length)
     to_qlc({:in, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, values]}, context)
   end
 
@@ -208,16 +244,16 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
          context
        )
        when is_list(values) do
-    source = Enum.at(context[:sources], source_index)
-    erl_var = Record.Attributes.to_erl_var(field, source)
-    "lists:member(#{erl_var}, [#{to_erl(values) |> Enum.join(", ")}])"
+    source = Enum.at(context.sources, source_index)
+    {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, values)
+    {"lists:member(#{erl_var}, #{bind_var})", context}
   end
 
   defp to_qlc(
          {op, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, {:^, [], [index]}]},
          context
        ) do
-    value = Enum.at(context[:params], index)
+    value = Enum.at(context.params, index)
     to_qlc({op, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, value]}, context)
   end
 
@@ -229,34 +265,28 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
           ]},
          context
        ) do
-    key_source = Enum.at(context[:sources], key_source_index)
-    value_source = Enum.at(context[:sources], value_source_index)
+    key_source = Enum.at(context.sources, key_source_index)
+    value_source = Enum.at(context.sources, value_source_index)
     erl_var = Record.Attributes.to_erl_var(key_field, key_source)
     value = Record.Attributes.to_erl_var(value_field, value_source)
-    "#{erl_var} #{op} #{value}"
+    {"#{erl_var} #{op} #{value}", context}
   end
 
   defp to_qlc(
          {:!=, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, value]},
          context
        ) do
-    source = Enum.at(context[:sources], source_index)
-    erl_var = Record.Attributes.to_erl_var(field, source)
-    value = to_erl(value)
-    "#{erl_var} =/= #{value}"
+    source = Enum.at(context.sources, source_index)
+    {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, value)
+    {"#{erl_var} =/= #{bind_var}", context}
   end
 
   defp to_qlc(
          {op, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, value]},
          context
        ) do
-    source = Enum.at(context[:sources], source_index)
-    erl_var = Record.Attributes.to_erl_var(field, source)
-    value = to_erl(value)
-    "#{erl_var} #{op} #{value}"
+    source = Enum.at(context.sources, source_index)
+    {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, value)
+    {"#{erl_var} #{op} #{bind_var}", context}
   end
-
-  defp to_erl(values) when is_list(values), do: Enum.map(values, &to_erl(&1))
-  defp to_erl(value) when is_binary(value), do: inspect(value, binaries: :as_binaries)
-  defp to_erl(value), do: value
 end
