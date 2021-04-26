@@ -399,13 +399,9 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
         :mnesia.transaction(fn ->
           :mnesia.write(@table_name, {TestSchema, 1, "field", nil, nil}, :write)
         end)
-
       record = TestRepo.get(TestSchema, 1)
-      {:atomic, _} = :mnesia.transaction(fn ->
-        :mnesia.write(@array_table_name, {ArrayTestSchema, 1, ["a", "b"], nil, nil}, :write)
-      end)
-      array_record = TestRepo.get(ArrayTestSchema, 1)
-      {:ok, array_record: array_record, record: record}
+
+      {:ok, record: record}
     end
 
     test "Repo#update valid record with [on_conflict: :replace_all]", %{record: record} do
@@ -428,7 +424,12 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
-    test "Repo#update valid record with array field and [on_conflict: :replace_all]", %{array_record: record} do
+    test "Repo#update valid record with array field and [on_conflict: :replace_all]" do
+      {:atomic, _} = :mnesia.transaction(fn ->
+        :mnesia.write(@array_table_name, {ArrayTestSchema, 1, ["a", "b"], nil, nil}, :write)
+      end)
+      record = TestRepo.get(ArrayTestSchema, 1)
+
       id = record.id
       update = ["c", "d"]
       changeset = ArrayTestSchema.changeset(record, %{field: update})
@@ -445,6 +446,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       end
 
       :mnesia.clear_table(@array_table_name)
+      :mnesia.clear_table(@table_name)
     end
 
     test "Repo#update non existing record with [on_conflict: :replace_all]", %{record: record} do
