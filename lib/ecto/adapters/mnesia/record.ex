@@ -26,15 +26,21 @@ defmodule Ecto.Adapters.Mnesia.Record do
   @spec build(params :: Keyword.t(), context :: Keyword.t()) :: record :: t()
   def build(params, context) do
     table_name = context[:table_name]
-    schema = context[:schema]
 
-    {key, _source, type} = context[:autogenerate_id] || {nil, nil, nil}
+    record_name =
+      case context[:meta] do
+        %{record_name: :schema} -> context[:schema]
+        %{record_name: :table_name} -> context[:table_name]
+        %{record_name: resolver} when is_function(resolver, 1) -> resolver.(context[:schema])
+      end
+
+    {key, source, type} = context[:autogenerate_id] || {nil, nil, nil}
 
     attributes(table_name)
     |> Enum.map(fn
-      ^key ->
+      ^source ->
         params[key] ||
-          Mnesia.autogenerate(type)
+          Mnesia.autogenerate({{record_name, source}, type})
 
       :inserted_at ->
         # TODO Repo#insert_all do not set timestamps, pickup Repo timestamps configuration
@@ -52,7 +58,7 @@ defmodule Ecto.Adapters.Mnesia.Record do
           :error -> nil
         end
     end)
-    |> List.insert_at(0, schema)
+    |> List.insert_at(0, record_name)
     |> List.to_tuple()
   end
 
