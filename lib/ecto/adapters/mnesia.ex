@@ -543,7 +543,11 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Transaction
   def rollback(_adapter_meta, value) do
-    throw(:mnesia.abort(value))
+    if :mnesia.is_transaction() do
+      throw(:mnesia.abort(value))
+    else
+      raise "not inside transaction"
+    end
   end
 
   @impl Ecto.Adapter.Storage
