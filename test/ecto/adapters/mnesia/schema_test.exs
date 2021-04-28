@@ -37,6 +37,10 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       struct
       |> Ecto.Changeset.cast(params, [:field])
     end
+
+    defimpl Ecto.Adapters.Mnesia.Recordable do
+      def record_name(_s), do: :alt_record
+    end
   end
 
   defmodule ArrayTestSchema do

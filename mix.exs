@@ -19,7 +19,8 @@ defmodule EctoMnesia.MixProject do
         main: "Ecto.Adapters.Mnesia",
         extras: ["README.md"]
       ],
-      elixirc_paths: elixirc_paths(Mix.env())
+      elixirc_paths: elixirc_paths(Mix.env()),
+      consolidate_protocols: Mix.env() != :test
     ]
   end
 
