@@ -332,21 +332,7 @@ defmodule Ecto.Adapters.Mnesia do
 
     case :timer.tc(&mnesia_transaction_wrapper/2, [
            adapter_meta,
-           fn ->
-             case on_conflict do
-               {:raise, _, _} ->
-                 with [] <- :mnesia.read(table_name, id, :read),
-                      :ok <- :mnesia.write(table_name, record, :write) do
-                   [record]
-                 else
-                   [_record] ->
-                     :mnesia.abort("Record already exists")
-                 end
-
-               {_, _, _} ->
-                 with :ok <- :mnesia.write(table_name, record, :write), do: [record]
-             end
-           end
+           fn -> do_insert(table_name, id, record, on_conflict) end
          ]) do
       {time, {:atomic, [record]}} ->
         result =
@@ -408,20 +394,7 @@ defmodule Ecto.Adapters.Mnesia do
              Enum.map(records, fn params ->
                record = Record.build(params, context)
                id = elem(record, 1)
-
-               case on_conflict do
-                 {:raise, _, _} ->
-                   with [] <- :mnesia.read(table_name, id, :read),
-                        :ok <- :mnesia.write(table_name, record, :write) do
-                     [record]
-                   else
-                     [_record] ->
-                       :mnesia.abort("Record already exists")
-                   end
-
-                 {_, _, _} ->
-                   with :ok <- :mnesia.write(table_name, record, :write), do: [record]
-               end
+               do_insert(table_name, id, record, on_conflict)
              end)
            end
          ]) do
@@ -633,6 +606,22 @@ defmodule Ecto.Adapters.Mnesia do
 
       false ->
         :mnesia.transaction(fun)
+    end
+  end
+
+  defp do_insert(table_name, id, record, on_conflict) do
+    case on_conflict do
+      {:raise, _, _} ->
+        with [] <- :mnesia.read(table_name, id, :read),
+             :ok <- :mnesia.write(table_name, record, :write) do
+          [record]
+        else
+          [_record] ->
+            :mnesia.abort("Record already exists")
+        end
+
+      {_, _, _} ->
+        with :ok <- :mnesia.write(table_name, record, :write), do: [record]
     end
   end
 end
