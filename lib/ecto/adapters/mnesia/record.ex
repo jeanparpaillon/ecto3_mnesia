@@ -41,12 +41,12 @@ defmodule Ecto.Adapters.Mnesia.Record do
     table_name = context.table_name
     record_name = context |> new_struct() |> Recordable.record_name()
 
-    {key, source, type} = get_in(context, [:schema_meta, :autogenerate_id]) || {nil, nil, nil}
+    {_key, source, type} = get_in(context, [:schema_meta, :autogenerate_id]) || {nil, nil, nil}
 
     attributes(table_name)
     |> Enum.map(fn
       ^source ->
-        params[key] ||
+        params[source] ||
           Mnesia.autogenerate({{record_name, source}, type})
 
       :inserted_at ->
