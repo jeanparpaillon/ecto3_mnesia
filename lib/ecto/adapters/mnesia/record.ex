@@ -8,38 +8,45 @@ defmodule Ecto.Adapters.Mnesia.Record do
     ]
 
   alias Ecto.Adapters.Mnesia
+  alias Ecto.Adapters.Mnesia.Recordable
 
   @type t :: tuple()
+  @type context :: %{
+          :table_name => atom(),
+          :schema_meta => %{
+            optional(:autogenerate_id) =>
+              {schema_field :: atom(), source_field :: atom(), Ecto.Type.t()},
+            optional(:context) => term(),
+            optional(:prefix) => binary() | nil,
+            :schema => atom(),
+            optional(:source) => binary()
+          },
+          optional(:adapter_meta) => Ecto.Adapter.Schema.adapter_meta()
+        }
 
-  @spec to_schema(table_name :: atom(), record :: t()) :: struct()
-  def to_schema(table_name, record) do
+  @spec to_schema(record :: t(), context()) :: struct()
+  def to_schema(record, context) do
     Enum.reduce(
-      attributes(table_name),
+      attributes(context.table_name),
       # schema struct
-      struct(elem(record, 0)),
+      struct(context.schema_meta.schema),
       fn attribute, struct ->
-        %{struct | attribute => elem(record, field_index(attribute, table_name))}
+        %{struct | attribute => elem(record, field_index(attribute, context.table_name))}
       end
     )
   end
 
-  @spec build(params :: Keyword.t(), context :: Keyword.t()) :: record :: t()
+  @spec build(params :: Keyword.t() | [tuple()], context()) :: record :: t()
   def build(params, context) do
-    table_name = context[:table_name]
+    table_name = context.table_name
+    record_name = context |> new_struct() |> Recordable.record_name()
 
-    record_name =
-      case context[:meta] do
-        %{record_name: :schema} -> context[:schema]
-        %{record_name: :table_name} -> context[:table_name]
-        %{record_name: resolver} when is_function(resolver, 1) -> resolver.(context[:schema])
-      end
-
-    {key, source, type} = context[:autogenerate_id] || {nil, nil, nil}
+    {_key, source, type} = get_in(context, [:schema_meta, :autogenerate_id]) || {nil, nil, nil}
 
     attributes(table_name)
     |> Enum.map(fn
       ^source ->
-        params[key] ||
+        params[source] ||
           Mnesia.autogenerate({{record_name, source}, type})
 
       :inserted_at ->
@@ -62,10 +69,10 @@ defmodule Ecto.Adapters.Mnesia.Record do
     |> List.to_tuple()
   end
 
-  @spec put_change(record :: t(), params :: Keyword.t(), context :: Keyword.t()) :: record :: t()
+  @spec put_change(record :: t(), params :: Keyword.t(), context()) :: record :: t()
   def put_change(record, params, context) do
-    table_name = context[:table_name]
-    schema = context[:schema]
+    table_name = context.table_name
+    record_name = context |> new_struct() |> Recordable.record_name()
 
     record
     |> Tuple.to_list()
@@ -77,15 +84,19 @@ defmodule Ecto.Adapters.Mnesia.Record do
         :error -> attribute
       end
     end)
-    |> List.insert_at(0, schema)
+    |> List.insert_at(0, record_name)
     |> List.to_tuple()
   end
 
-  @spec attribute(record :: t(), field :: atom(), context :: Keyword.t()) :: atribute :: any()
+  @spec attribute(record :: t(), field :: atom(), context()) :: attribute :: any()
   def attribute(record, field, context) do
-    table_name = context[:table_name]
+    table_name = context.table_name
 
     elem(record, field_index(field, table_name))
+  end
+
+  defp new_struct(context) do
+    apply(get_in(context, [:schema_meta, :schema]), :__schema__, [:loaded])
   end
 
   defmodule Attributes do

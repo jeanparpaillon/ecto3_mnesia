@@ -102,8 +102,6 @@ defmodule Ecto.Adapters.Mnesia do
 
   require Logger
 
-  @default_meta %{record_name: :schema}
-
   @impl Ecto.Adapter
   defmacro __before_compile__(_env), do: true
 
@@ -123,8 +121,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter
   def init(config \\ []) do
-    meta = :ecto3_mnesia |> Application.get_env(:adapter, []) |> Enum.into(%{})
-    {:ok, Connection.child_spec(config), Map.merge(@default_meta, meta)}
+    {:ok, Connection.child_spec(config), %{}}
   end
 
   @impl Ecto.Adapter
@@ -189,19 +186,24 @@ defmodule Ecto.Adapters.Mnesia do
         params,
         _opts
       ) do
-    {table_name, _schema} = Enum.at(sources, 0)
-    context = [params: params]
+    {table_name, schema} = Enum.at(sources, 0)
+    answers_context = [params: params]
+
+    record_context = %{
+      table_name: table_name,
+      schema_meta: %{schema: schema}
+    }
 
     case :timer.tc(&mnesia_transaction_wrapper/2, [
            adapter_meta,
            fn ->
              query.(params)
-             |> answers.(context)
+             |> answers.(answers_context)
              |> Enum.map(&Tuple.to_list(&1))
              |> Enum.map(fn record -> new_record.(record, params) end)
              |> Enum.map(fn record ->
                with :ok <- :mnesia.write(table_name, record, :write) do
-                 Record.to_schema(table_name, record)
+                 Record.to_schema(record, record_context)
                end
              end)
            end
@@ -316,22 +318,14 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   @impl Ecto.Adapter.Schema
-  def insert(
-        adapter_meta,
-        %{schema: schema, source: source, autogenerate_id: autogenerate_id},
-        params,
-        on_conflict,
-        returning,
-        _opts
-      ) do
-    table_name = String.to_atom(source)
+  def insert(adapter_meta, schema_meta, params, on_conflict, returning, _opts) do
+    table_name = String.to_atom(schema_meta.source)
 
-    context = [
+    context = %{
       table_name: table_name,
-      schema: schema,
-      autogenerate_id: autogenerate_id,
-      meta: adapter_meta
-    ]
+      schema_meta: schema_meta,
+      adapter_meta: adapter_meta
+    }
 
     record = Record.build(params, context)
     id = elem(record, 1)
@@ -361,13 +355,15 @@ defmodule Ecto.Adapters.Mnesia do
             {field, Record.attribute(record, field, context)}
           end)
 
-        Logger.debug("QUERY OK source=#{inspect(source)} type=insert db=#{time}µs")
+        Logger.debug("QUERY OK source=#{inspect(schema_meta.source)} type=insert db=#{time}µs")
 
         {:ok, result}
 
       {time, {:aborted, error}} ->
         Logger.debug(
-          "QUERY ERROR source=#{inspect(source)} type=insert db=#{time}µs #{inspect(error)}"
+          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert db=#{time}µs #{
+            inspect(error)
+          }"
         )
 
         {:invalid, [mnesia: inspect(error)]}
@@ -391,21 +387,20 @@ defmodule Ecto.Adapters.Mnesia do
 
   def insert_all(
         adapter_meta,
-        %{schema: schema, source: source, autogenerate_id: autogenerate_id},
+        schema_meta,
         _header,
         records,
         on_conflict,
         returning,
         _opts
       ) do
-    table_name = String.to_atom(source)
+    table_name = String.to_atom(schema_meta.source)
 
-    context = [
+    context = %{
       table_name: table_name,
-      schema: schema,
-      autogenerate_id: autogenerate_id,
-      meta: adapter_meta
-    ]
+      schema_meta: schema_meta,
+      adapter_meta: adapter_meta
+    }
 
     case :timer.tc(&mnesia_transaction_wrapper/2, [
            adapter_meta,
@@ -438,13 +433,17 @@ defmodule Ecto.Adapters.Mnesia do
             end)
           end)
 
-        Logger.debug("QUERY OK source=#{inspect(source)} type=insert_all db=#{time}µs")
+        Logger.debug(
+          "QUERY OK source=#{inspect(schema_meta.source)} type=insert_all db=#{time}µs"
+        )
 
         {length(result), result}
 
       {time, {:aborted, error}} ->
         Logger.debug(
-          "QUERY ERROR source=#{inspect(source)} type=insert_all db=#{time}µs #{inspect(error)}"
+          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert_all db=#{time}µs #{
+            inspect(error)
+          }"
         )
 
         {0, nil}
@@ -454,7 +453,7 @@ defmodule Ecto.Adapters.Mnesia do
   @impl Ecto.Adapter.Schema
   def update(
         adapter_meta,
-        %{schema: schema, source: source, autogenerate_id: autogenerate_id},
+        %{schema: schema, source: source} = schema_meta,
         params,
         filters,
         returning,
@@ -463,13 +462,13 @@ defmodule Ecto.Adapters.Mnesia do
     table_name = String.to_atom(source)
     source = {table_name, schema}
 
-    context = [
+    answers_context = [params: params]
+
+    record_context = %{
       table_name: table_name,
-      schema: schema,
-      autogenerate_id: autogenerate_id,
-      params: params,
-      meta: adapter_meta
-    ]
+      schema_meta: schema_meta,
+      adapter_meta: adapter_meta
+    }
 
     query = Mnesia.Qlc.query(:all, [], [source]).(filters)
 
@@ -477,7 +476,7 @@ defmodule Ecto.Adapters.Mnesia do
            :timer.tc(&mnesia_transaction_wrapper/2, [
              adapter_meta,
              fn ->
-               query.(params) |> Mnesia.Qlc.answers(nil, nil).(context)
+               query.(params) |> Mnesia.Qlc.answers(nil, nil).(answers_context)
              end
            ]),
          {updateTime, {:atomic, update}} <-
@@ -486,8 +485,8 @@ defmodule Ecto.Adapters.Mnesia do
              fn ->
                update =
                  List.zip([schema.__schema__(:fields), attributes])
-                 |> Record.build(context)
-                 |> Record.put_change(params, context)
+                 |> Record.build(record_context)
+                 |> Record.put_change(params, record_context)
 
                with :ok <- :mnesia.write(table_name, update, :write) do
                  update
@@ -497,7 +496,7 @@ defmodule Ecto.Adapters.Mnesia do
       result =
         returning
         |> Enum.map(fn field ->
-          {field, Record.attribute(update, field, context)}
+          {field, Record.attribute(update, field, record_context)}
         end)
 
       Logger.debug(

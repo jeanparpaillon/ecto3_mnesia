@@ -86,6 +86,30 @@ defmodule MyApp.Context.Schema do
 end
 ```
 
+### Record name
+
+mnesia tables can have record name different from table name. By default, the
+adapter use schema name (module name) as record name. For compatibility with
+existing applications, one can customize record name per schema, by implementing
+the `Ecto.Adapters.Mnesia.Recordable` protocol.
+
+```
+defmodule MyApp.Schema do
+  ...
+  schema "table_name" do
+    field :field, :string
+
+    timestamps()
+  end
+
+  ...
+
+  defimpl Ecto.Adapters.Mnesia.Recordable do
+    def record_name(_s), do: :schema
+  end  
+end
+```
+
 ## Known issues
 - This package makes not a great usage of indices (https://gitlab.com/patatoid/ecto3_mnesia/-/issues/6)
 - Delete queries using a select must include primary key (https://gitlab.com/patatoid/ecto3_mnesia/-/issues/9)

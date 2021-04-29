@@ -5,6 +5,8 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
   alias Ecto.Adapters.Mnesia
 
   @table_name __MODULE__.Table
+  @alt_record_table_name __MODULE__.AltRecordTable
+  @alt_record_name :alt_record
   @array_table_name __MODULE__.ArrayTable
   @binary_id_table_name __MODULE__.BinaryIdTable
   @without_primary_key_table_name __MODULE__.WithoutPrimaryKeyTable
@@ -24,13 +26,30 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     end
   end
 
+  defmodule TestSchemaAltRecord do
+    use Ecto.Schema
+
+    schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.AltRecordTable}" do
+      field(:field, :string)
+    end
+
+    def changeset(%__MODULE__{} = struct, params) do
+      struct
+      |> Ecto.Changeset.cast(params, [:field])
+    end
+
+    defimpl Ecto.Adapters.Mnesia.Recordable do
+      def record_name(_s), do: :alt_record
+    end
+  end
+
   defmodule ArrayTestSchema do
     use Ecto.Schema
 
     schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.ArrayTable}" do
       timestamps()
 
-      field :field, {:array, :string}
+      field(:field, {:array, :string})
     end
 
     def changeset(%ArrayTestSchema{} = struct, params) do
@@ -76,27 +95,37 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     Mnesia.ensure_all_started([], :permanent)
     {:ok, _repo} = TestRepo.start_link()
 
-    :mnesia.create_table(@table_name, [
+    :mnesia.create_table(@table_name,
       ram_copies: [node()],
       record_name: TestSchema,
       attributes: [:id, :field, :inserted_at, :updated_at],
       storage_properties: [ets: [:compressed]],
       type: :ordered_set
-    ])
-    :mnesia.create_table(@array_table_name, [
+    )
+
+    :mnesia.create_table(@alt_record_table_name,
+      ram_copies: [node()],
+      record_name: @alt_record_name,
+      attributes: [:id, :field],
+      storage_properties: [ets: [:compressed]],
+      type: :ordered_set
+    )
+
+    :mnesia.create_table(@array_table_name,
       ram_copies: [node()],
       record_name: ArrayTestSchema,
       attributes: [:id, :field, :inserted_at, :updated_at],
-      storage_properties: [ ets: [:compressed] ],
+      storage_properties: [ets: [:compressed]],
       type: :ordered_set
-    ])
-    :mnesia.create_table(@binary_id_table_name, [
+    )
+
+    :mnesia.create_table(@binary_id_table_name,
       ram_copies: [node()],
       record_name: BinaryIdTestSchema,
       attributes: [:id, :field, :inserted_at, :updated_at],
       storage_properties: [ets: [:compressed]],
       type: :ordered_set
-    ])
+    )
 
     :mnesia.create_table(@without_primary_key_table_name,
       ram_copies: [node()],
@@ -128,6 +157,26 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       end
 
       :mnesia.clear_table(@table_name)
+    end
+
+    test "Repo#insert valid record - alt record name" do
+      case TestRepo.insert(%TestSchemaAltRecord{field: "field"}) do
+        {:ok, %{id: id, field: "field"}} ->
+          assert true
+
+          {:atomic, [result]} =
+            :mnesia.transaction(fn ->
+              :mnesia.read(@alt_record_table_name, id)
+            end)
+
+          {@alt_record_name, ^id, field} = result
+          assert field == "field"
+
+        _ ->
+          assert false
+      end
+
+      :mnesia.clear_table(@alt_record_table_name)
     end
 
     test "Repo#insert valid record with existing record, [on_conflict: :replace_all]" do
@@ -207,10 +256,6 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
             :mnesia.transaction(fn ->
               :mnesia.read(@array_table_name, id)
             end)
-
-          {:atomic, [{_, _id, field, _, _}]} = :mnesia.transaction(fn ->
-            :mnesia.read(@array_table_name, id)
-          end)
 
           assert field == array
 
@@ -311,6 +356,33 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
+    test "Repo#insert_all valid records - alt record name" do
+      case TestRepo.insert_all(
+             TestSchemaAltRecord,
+             [%{field: "field 1"}, %{field: "field 2"}],
+             returning: [:id]
+           ) do
+        {count, _records} ->
+          assert count == 2
+
+          {:atomic, results} =
+            :mnesia.transaction(fn ->
+              :mnesia.foldl(fn record, acc -> [record | acc] end, [], @alt_record_table_name)
+            end)
+
+          assert Enum.all?(results, fn
+                   {@alt_record_name, _, "field 1"} -> true
+                   {@alt_record_name, _, "field 2"} -> true
+                   _ -> false
+                 end)
+
+        _ ->
+          assert false
+      end
+
+      :mnesia.clear_table(@alt_record_table_name)
+    end
+
     test "Repo#insert_all valid records with returning opt" do
       case TestRepo.insert_all(
              TestSchema,
@@ -399,6 +471,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
         :mnesia.transaction(fn ->
           :mnesia.write(@table_name, {TestSchema, 1, "field", nil, nil}, :write)
         end)
+
       record = TestRepo.get(TestSchema, 1)
 
       {:ok, record: record}
@@ -425,9 +498,11 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     end
 
     test "Repo#update valid record with array field and [on_conflict: :replace_all]" do
-      {:atomic, _} = :mnesia.transaction(fn ->
-        :mnesia.write(@array_table_name, {ArrayTestSchema, 1, ["a", "b"], nil, nil}, :write)
-      end)
+      {:atomic, _} =
+        :mnesia.transaction(fn ->
+          :mnesia.write(@array_table_name, {ArrayTestSchema, 1, ["a", "b"], nil, nil}, :write)
+        end)
+
       record = TestRepo.get(ArrayTestSchema, 1)
 
       id = record.id
@@ -437,12 +512,14 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       case TestRepo.update(changeset) do
         {:ok, %ArrayTestSchema{id: ^id, field: ^update}} ->
           case :mnesia.transaction(fn ->
-            :mnesia.read(@array_table_name, id)
-          end) do
+                 :mnesia.read(@array_table_name, id)
+               end) do
             {:atomic, [{ArrayTestSchema, ^id, ^update, _, _}]} -> assert true
             e -> assert false == e
           end
-        _ -> assert false
+
+        _ ->
+          assert false
       end
 
       :mnesia.clear_table(@array_table_name)
@@ -457,6 +534,39 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       end
 
       :mnesia.clear_table(@table_name)
+    end
+  end
+
+  describe "Ecto.Adapters.Schema#update - alt record name" do
+    setup do
+      {:atomic, _} =
+        :mnesia.transaction(fn ->
+          :mnesia.write(@alt_record_table_name, {@alt_record_name, 1, "field"}, :write)
+        end)
+
+      record = TestRepo.get(TestSchemaAltRecord, 1)
+
+      {:ok, record: record}
+    end
+
+    test "Repo#update valid record with [on_conflict: :replace_all]", %{record: record} do
+      id = record.id
+      changeset = TestSchemaAltRecord.changeset(record, %{field: "field updated"})
+
+      case TestRepo.update(changeset) do
+        {:ok, %TestSchemaAltRecord{id: ^id, field: "field updated"}} ->
+          case :mnesia.transaction(fn ->
+                 :mnesia.read(@alt_record_table_name, id)
+               end) do
+            {:atomic, [{@alt_record_name, ^id, "field updated"}]} -> assert true
+            e -> assert false == e
+          end
+
+        _ ->
+          assert false
+      end
+
+      :mnesia.clear_table(@alt_record_table_name)
     end
   end
 
