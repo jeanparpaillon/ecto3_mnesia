@@ -99,6 +99,7 @@ defmodule Ecto.Adapters.Mnesia do
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Record
+  alias Ecto.Adapters.Mnesia.Table
 
   require Logger
 
@@ -327,12 +328,9 @@ defmodule Ecto.Adapters.Mnesia do
       adapter_meta: adapter_meta
     }
 
-    record = Record.build(params, context)
-    id = elem(record, 1)
-
     case :timer.tc(&mnesia_transaction_wrapper/2, [
            adapter_meta,
-           fn -> do_insert(table_name, id, record, on_conflict) end
+           fn -> upsert(context, params, on_conflict) end
          ]) do
       {time, {:atomic, [record]}} ->
         result =
@@ -340,6 +338,8 @@ defmodule Ecto.Adapters.Mnesia do
           |> Enum.map(fn field ->
             {field, Record.attribute(record, field, context)}
           end)
+
+        # IO.inspect({record, returning, result}, label: "{RECORD, RET, RES}")
 
         Logger.debug("QUERY OK source=#{inspect(schema_meta.source)} type=insert db=#{time}µs")
 
@@ -392,9 +392,7 @@ defmodule Ecto.Adapters.Mnesia do
            adapter_meta,
            fn ->
              Enum.map(records, fn params ->
-               record = Record.build(params, context)
-               id = elem(record, 1)
-               do_insert(table_name, id, record, on_conflict)
+               upsert(context, params, on_conflict)
              end)
            end
          ]) do
@@ -609,19 +607,70 @@ defmodule Ecto.Adapters.Mnesia do
     end
   end
 
-  defp do_insert(table_name, id, record, on_conflict) do
-    case on_conflict do
-      {:raise, _, _} ->
-        with [] <- :mnesia.read(table_name, id, :read),
-             :ok <- :mnesia.write(table_name, record, :write) do
-          [record]
-        else
-          [_record] ->
-            :mnesia.abort("Record already exists")
-        end
+  defp upsert(context, params, {:raise, [], []}) do
+    case conflict?(params, context) do
+      nil ->
+        do_insert(params, context)
 
-      {_, _, _} ->
-        with :ok <- :mnesia.write(table_name, record, :write), do: [record]
+      _conflict ->
+        :mnesia.abort("Record already exists")
+    end
+  end
+
+  defp upsert(context, params, {:nothing, [], []}) do
+    case conflict?(params, context) do
+      nil ->
+        do_insert(params, context)
+
+      _conflict ->
+        [Record.build(params, context)]
+    end
+  end
+
+  defp upsert(context, params, {fields, [], []}) when is_list(fields) do
+    case Table.attributes(context.table_name) -- fields do
+      [] ->
+        # ie replace_all
+        do_insert(params, context)
+
+      _ ->
+        case conflict?(params, context) do
+          nil ->
+            do_insert(params, context)
+
+          conflict ->
+            record =
+              params
+              |> Record.gen_id(context)
+              |> Record.merge(conflict, context, fields)
+              |> Record.build(context)
+
+            with :ok <- :mnesia.write(context.table_name, record, :write), do: [record]
+        end
+    end
+  end
+
+  defp do_insert(params, context) do
+    record =
+      params
+      |> Record.gen_id(context)
+      |> Record.build(context)
+
+    with :ok <- :mnesia.write(context.table_name, record, :write), do: [record]
+  end
+
+  defp conflict?(params, context) do
+    params
+    |> Record.id(context)
+    |> case do
+      nil ->
+        nil
+
+      id ->
+        case :mnesia.read(context.table_name, id, :read) do
+          [] -> nil
+          [rec] -> rec
+        end
     end
   end
 end
