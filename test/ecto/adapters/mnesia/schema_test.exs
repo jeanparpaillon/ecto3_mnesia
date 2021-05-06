@@ -10,6 +10,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
   @array_table_name __MODULE__.ArrayTable
   @binary_id_table_name __MODULE__.BinaryIdTable
   @without_primary_key_table_name __MODULE__.WithoutPrimaryKeyTable
+  @composed_key_table_name __MODULE__.ComposedKeyTestSchema
 
   defmodule TestSchema do
     use Ecto.Schema
@@ -40,10 +41,13 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
     defimpl Ecto.Adapters.Mnesia.Recordable do
       def record_name(_s), do: :alt_record
+
       def load(struct, record, context),
         do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).load(struct, record, context)
+
       def dump(struct, params, context),
         do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).dump(struct, params, context)
+
       def key(struct, params, context),
         do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).key(struct, params, context)
     end
@@ -96,6 +100,33 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     end
   end
 
+  defmodule ComposedKeyTestSchema do
+    use Ecto.Schema
+
+    @primary_key false
+    schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.ComposedKeyTestSchema}" do
+      field :key1, :id, primary_key: true, autogenerate: true
+      field :key2, :id, primary_key: true
+      field :field, :string
+    end
+
+    defimpl Ecto.Adapters.Mnesia.Recordable do
+      def record_name(%{__struct__: schema}), do: schema
+
+      def load(_struct, {_, {key1, key2}, field}, _context) do
+        [key1: key1, key2: key2, field: field]
+      end
+
+      def dump(_struct, params, _context) do
+        [{Keyword.get(params, :key1), Keyword.get(params, :key2)}, Keyword.get(params, :field)]
+      end
+
+      def key(_struct, params, _context) do
+        {Keyword.get(params, :key1), Keyword.get(params, :key2)}
+      end
+    end
+  end
+
   setup_all do
     ExUnit.CaptureLog.capture_log(fn -> Mnesia.storage_up(nodes: [node()]) end)
     Mnesia.ensure_all_started([], :permanent)
@@ -141,7 +172,15 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       type: :ordered_set
     )
 
-    :mnesia.wait_for_tables([@table_name, @binary_id_table_name], 1000)
+    :mnesia.create_table(@composed_key_table_name,
+      ram_copies: [node()],
+      record_name: ComposedKeyTestSchema,
+      attributes: [:key, :field],
+      storage_properties: [ets: [:compressed]],
+      type: :ordered_set
+    )
+
+    :mnesia.wait_for_tables([@table_name, @binary_id_table_name, @composed_key_table_name], 1000)
   end
 
   describe "Ecto.Adapters.Schema#insert" do
@@ -325,6 +364,25 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
           {TestSchema, ^id, field, _, _} = result
           assert field == "field"
+
+        _ ->
+          assert false
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    test "Repo#insert valid record with custom Recordable protocol" do
+      case TestRepo.insert(%ComposedKeyTestSchema{key2: 1, field: "field"}) do
+        {:ok, %ComposedKeyTestSchema{key1: key1, key2: key2} = ret} ->
+          assert true
+
+          {:atomic, [result]} =
+            :mnesia.transaction(fn ->
+              :mnesia.read(@composed_key_table_name, {ret.key1, ret.key2})
+            end)
+
+          assert {ComposedKeyTestSchema, {^key1, ^key2}, "field"} = result
 
         _ ->
           assert false
