@@ -28,6 +28,12 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
 
     defimpl Ecto.Adapters.Mnesia.Recordable do
       def record_name(_), do: :rec
+      def load(struct, record, context),
+        do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).load(struct, record, context)
+      def dump(struct, params, context),
+        do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).dump(struct, params, context)
+      def key(struct, params, context),
+        do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).key(struct, params, context)
     end
   end
 

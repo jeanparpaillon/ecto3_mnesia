@@ -1,12 +1,5 @@
 defmodule Ecto.Adapters.Mnesia.Record do
   @moduledoc false
-  import Ecto.Adapters.Mnesia.Table,
-    only: [
-      attributes: 1,
-      field_index: 2,
-      field_name: 2
-    ]
-
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Recordable
 
@@ -26,22 +19,57 @@ defmodule Ecto.Adapters.Mnesia.Record do
 
   @spec to_schema(record :: t(), context()) :: struct()
   def to_schema(record, context) do
-    Enum.reduce(
-      attributes(context.table_name),
-      # schema struct
-      struct(context.schema_meta.schema),
-      fn attribute, struct ->
-        %{struct | attribute => elem(record, field_index(attribute, context.table_name))}
-      end
-    )
+    loaded = loaded(context)
+
+    loaded
+    |> Map.merge(Enum.into(Recordable.load(loaded, record, context), %{}))
   end
 
-  @spec id(Keyword.t(), context()) :: term() | nil
-  def id(params, context) do
-    case apply(get_in(context, [:schema_meta, :schema]), :__schema__, [:primary_key]) do
-      [key] -> params[key]
-      _ -> nil
-    end
+  @spec to_record(params :: Keyword.t() | [tuple()], context()) :: record :: t()
+  def to_record(params, context) do
+    struct = loaded(context)
+    record_name = Recordable.record_name(struct)
+
+    struct
+    |> Recordable.dump(params, context)
+    |> List.insert_at(0, record_name)
+    |> List.to_tuple()
+  end
+
+  @spec to_keyword(t(), context()) :: Keyword.t()
+  def to_keyword(record, context) do
+    context |> loaded() |> Recordable.load(record, context)
+  end
+
+  @spec key(Keyword.t(), context()) :: term() | nil
+  def key(params, context) do
+    context |> loaded() |> Recordable.key(params, context)
+  end
+
+  @spec update(orig :: Keyword.t(), new :: Keyword.t(), replace :: list() | :all, context()) ::
+          Keyword.t()
+  def update(orig, new, replace \\ :all, _context) do
+    orig
+    |> Enum.reduce([], fn {field, old}, acc ->
+      if replace == :all or Enum.member?(replace, field) do
+        case Keyword.fetch(new, field) do
+          {:ok, value} -> Keyword.put(acc, field, value)
+          :error -> Keyword.put(acc, field, old)
+        end
+      else
+        Keyword.put(acc, field, old)
+      end
+    end)
+  end
+
+  @spec select(record :: t(), attributes :: [atom()], context()) :: [term()]
+  def select(record, fields, context) do
+    loaded = loaded(context)
+    fields = MapSet.new(fields)
+
+    loaded
+    |> Recordable.load(record, context)
+    |> Enum.filter(&Enum.member?(fields, elem(&1, 0)))
   end
 
   @spec gen_id(Keyword.t(), context()) :: Keyword.t()
@@ -54,73 +82,16 @@ defmodule Ecto.Adapters.Mnesia.Record do
         if params[source] do
           params
         else
-          record_name = context |> new_struct() |> Recordable.record_name()
+          record_name = context |> loaded() |> Recordable.record_name()
           Keyword.put(params, source, Mnesia.autogenerate({{record_name, source}, type}))
         end
     end
   end
 
-  @spec build(params :: Keyword.t() | [tuple()], context()) :: record :: t()
-  def build(params, context) do
-    table_name = context.table_name
-    record_name = context |> new_struct() |> Recordable.record_name()
-
-    attributes(table_name)
-    |> Enum.map(fn attribute ->
-      case Keyword.fetch(params, attribute) do
-        {:ok, value} -> value
-        :error -> nil
-      end
-    end)
-    |> List.insert_at(0, record_name)
-    |> List.to_tuple()
-  end
-
-  @spec put_change(record :: t(), params :: Keyword.t(), context()) :: record :: t()
-  def put_change(record, params, context) do
-    table_name = context.table_name
-    record_name = context |> new_struct() |> Recordable.record_name()
-
-    record
-    |> Tuple.to_list()
-    |> List.delete_at(0)
-    |> Enum.with_index()
-    |> Enum.map(fn {attribute, index} ->
-      case Keyword.fetch(params, field_name(index, table_name)) do
-        {:ok, value} -> value
-        :error -> attribute
-      end
-    end)
-    |> List.insert_at(0, record_name)
-    |> List.to_tuple()
-  end
-
-  @spec merge(Keyword.t(), record :: t(), context(), [atom()]) :: Keyword.t()
-  def merge(new_params, record, context, replace) do
-    old_params = record |> Tuple.to_list() |> List.delete_at(0)
-
-    [attributes(context.table_name), old_params]
-    |> List.zip()
-    |> Enum.reduce([], fn {field, old}, acc ->
-      if Enum.member?(replace, field) do
-        case Keyword.fetch(new_params, field) do
-          {:ok, new} -> Keyword.put(acc, field, new)
-          :error -> Keyword.put(acc, field, old)
-        end
-      else
-        Keyword.put(acc, field, old)
-      end
-    end)
-  end
-
-  @spec attribute(record :: t(), field :: atom(), context()) :: attribute :: any()
-  def attribute(record, field, context) do
-    table_name = context.table_name
-
-    elem(record, field_index(field, table_name))
-  end
-
-  defp new_struct(context) do
+  ###
+  ### Priv
+  ###
+  defp loaded(context) do
     apply(get_in(context, [:schema_meta, :schema]), :__schema__, [:loaded])
   end
 
