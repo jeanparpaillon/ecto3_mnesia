@@ -36,34 +36,41 @@ defmodule Ecto.Adapters.Mnesia.Record do
     )
   end
 
+  @spec id(Keyword.t(), context()) :: term() | nil
+  def id(params, context) do
+    case apply(get_in(context, [:schema_meta, :schema]), :__schema__, [:primary_key]) do
+      [key] -> params[key]
+      _ -> nil
+    end
+  end
+
+  @spec gen_id(Keyword.t(), context()) :: Keyword.t()
+  def gen_id(params, context) do
+    case get_in(context, [:schema_meta, :autogenerate_id]) do
+      nil ->
+        params
+
+      {_key, source, type} ->
+        if params[source] do
+          params
+        else
+          record_name = context |> new_struct() |> Recordable.record_name()
+          Keyword.put(params, source, Mnesia.autogenerate({{record_name, source}, type}))
+        end
+    end
+  end
+
   @spec build(params :: Keyword.t() | [tuple()], context()) :: record :: t()
   def build(params, context) do
     table_name = context.table_name
     record_name = context |> new_struct() |> Recordable.record_name()
 
-    {_key, source, type} = get_in(context, [:schema_meta, :autogenerate_id]) || {nil, nil, nil}
-
     attributes(table_name)
-    |> Enum.map(fn
-      ^source ->
-        params[source] ||
-          Mnesia.autogenerate({{record_name, source}, type})
-
-      :inserted_at ->
-        # TODO Repo#insert_all do not set timestamps, pickup Repo timestamps configuration
-        params[:inserted_at] ||
-          NaiveDateTime.utc_now()
-
-      :updated_at ->
-        # TODO Repo#insert_all do not set timestamps, pickup Repo timestamps configuration
-        params[:updated_at] ||
-          NaiveDateTime.utc_now()
-
-      attribute ->
-        case Keyword.fetch(params, attribute) do
-          {:ok, value} -> value
-          :error -> nil
-        end
+    |> Enum.map(fn attribute ->
+      case Keyword.fetch(params, attribute) do
+        {:ok, value} -> value
+        :error -> nil
+      end
     end)
     |> List.insert_at(0, record_name)
     |> List.to_tuple()
@@ -86,6 +93,24 @@ defmodule Ecto.Adapters.Mnesia.Record do
     end)
     |> List.insert_at(0, record_name)
     |> List.to_tuple()
+  end
+
+  @spec merge(Keyword.t(), record :: t(), context(), [atom()]) :: Keyword.t()
+  def merge(new_params, record, context, replace) do
+    old_params = record |> Tuple.to_list() |> List.delete_at(0)
+
+    [attributes(context.table_name), old_params]
+    |> List.zip()
+    |> Enum.reduce([], fn {field, old}, acc ->
+      if Enum.member?(replace, field) do
+        case Keyword.fetch(new_params, field) do
+          {:ok, new} -> Keyword.put(acc, field, new)
+          :error -> Keyword.put(acc, field, old)
+        end
+      else
+        Keyword.put(acc, field, old)
+      end
+    end)
   end
 
   @spec attribute(record :: t(), field :: atom(), context()) :: attribute :: any()
