@@ -74,7 +74,8 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
         |> Multi.insert(:rec2, changeset, on_conflict: :raise)
         |> TestRepo.transaction()
 
-      assert {:error, :rec2, %Changeset{errors: [id: {"has already been taken", _}]}, %{rec1: _}} = ret
+      assert {:error, :rec2, %Changeset{errors: [id: {"has already been taken", _}]}, %{rec1: _}} =
+               ret
     end
   end
 end

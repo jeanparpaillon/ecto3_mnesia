@@ -96,6 +96,8 @@ defmodule Ecto.Adapters.Mnesia do
 
   @ecto_vsn :ecto |> Application.spec(:vsn) |> to_string()
 
+  import Ecto.Query
+
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Record
@@ -598,7 +600,7 @@ defmodule Ecto.Adapters.Mnesia do
             {:aborted, reason}
 
           :exit, reason ->
-              {:aborted, reason}
+            {:aborted, reason}
         end
 
       false ->
@@ -640,7 +642,7 @@ defmodule Ecto.Adapters.Mnesia do
             do_insert(params, context)
 
           {conflict, _constraints} ->
-            orig = Record.to_keyword(conflict, context)
+            orig = conflict |> Map.from_struct() |> Enum.into([])
             new = Record.gen_id(params, context)
 
             record =
@@ -662,17 +664,33 @@ defmodule Ecto.Adapters.Mnesia do
     with :ok <- :mnesia.write(context.table_name, record, :write), do: [record]
   end
 
-  defp conflict?(params, context) do
+  defp conflict?(params, %{adapter_meta: %{repo: repo}} = context) do
     params
-    |> Record.key(context)
+    |> Record.uniques(context)
     |> case do
-      nil ->
+      [] ->
         nil
 
-      {key, value} ->
-        case :mnesia.read(context.table_name, value, :read) do
-          [] -> nil
-          [rec] -> {rec, [unique: "#{context.table_name}_#{key}_index"]}
+      uniques ->
+        context.schema_meta.schema
+        |> from()
+        |> where(^uniques)
+        |> repo.one()
+        |> case do
+          nil ->
+            nil
+
+          conflict ->
+            constraints =
+              uniques
+              |> Enum.reduce([], fn {key, value}, acc ->
+                case Map.get(conflict, key) do
+                  ^value -> [{:unique, "#{context.table_name}_#{key}_index"} | acc]
+                  _ -> acc
+                end
+              end)
+
+            {conflict, constraints}
         end
     end
   end

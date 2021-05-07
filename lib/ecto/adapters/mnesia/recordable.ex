@@ -27,12 +27,6 @@ defprotocol Ecto.Adapters.Mnesia.Recordable do
   """
   @spec dump(t(), Keyword.t(), Record.context()) :: list()
   def dump(struct, params, context)
-
-  @doc """
-  Return key from parameters, for given schema
-  """
-  @spec key(t(), Keyword.t(), Record.context()) :: {atom(), term()} | nil
-  def key(struct, params, context)
 end
 
 defimpl Ecto.Adapters.Mnesia.Recordable, for: Any do
@@ -40,8 +34,8 @@ defimpl Ecto.Adapters.Mnesia.Recordable, for: Any do
 
   def record_name(%{__struct__: schema}), do: schema
 
-  def load(_struct, record, context) do
-    field_names = Table.attributes(context.table_name)
+  def load(_struct, record, %{table_name: table_name}) do
+    field_names = Table.attributes(table_name)
 
     field_values =
       record
@@ -51,6 +45,7 @@ defimpl Ecto.Adapters.Mnesia.Recordable, for: Any do
     Enum.zip([field_names, field_values])
   end
 
+  @spec dump(any, any, %{:table_name => atom, optional(any) => any}) :: list
   def dump(_struct, params, %{table_name: table_name}) do
     Table.attributes(table_name)
     |> Enum.map(fn attribute ->
@@ -59,12 +54,5 @@ defimpl Ecto.Adapters.Mnesia.Recordable, for: Any do
         :error -> nil
       end
     end)
-  end
-
-  def key(%{__struct__: schema}, params, _context) do
-    case apply(schema, :__schema__, [:primary_key]) do
-      [key] -> {key, params[key]}
-      _ -> nil
-    end
   end
 end
