@@ -3,6 +3,8 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
 
   alias EctoMnesia.TestRepo
   alias Ecto.Adapters.Mnesia
+  alias Ecto.Changeset
+  alias Ecto.Multi
 
   @table_name __MODULE__.Table
 
@@ -11,6 +13,12 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
 
     schema "#{Ecto.Adapters.MnesiaTransactionIntegrationTest.Table}" do
       field(:field, :string)
+    end
+
+    def changeset(params) do
+      %__MODULE__{}
+      |> Ecto.Changeset.cast(Map.new(params), [:id, :field])
+      |> Ecto.Changeset.unique_constraint(:id)
     end
   end
 
@@ -53,6 +61,20 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
       TestRepo.transaction(fn ->
         assert TestRepo.in_transaction?() == false
       end)
+    end
+  end
+
+  describe "Ecto.Multi" do
+    test "Rollback when insert conflict" do
+      changeset = TestSchema.changeset(id: 1)
+
+      ret =
+        Multi.new()
+        |> Multi.insert(:rec1, changeset)
+        |> Multi.insert(:rec2, changeset, on_conflict: :raise)
+        |> TestRepo.transaction()
+
+      assert {:error, :rec2, %Changeset{errors: [id: {"has already been taken", _}]}, %{rec1: _}} = ret
     end
   end
 end

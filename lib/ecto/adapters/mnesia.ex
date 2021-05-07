@@ -343,7 +343,7 @@ defmodule Ecto.Adapters.Mnesia do
           }"
         )
 
-        {:invalid, [mnesia: inspect(error)]}
+        {:invalid, error}
     end
   end
 
@@ -591,7 +591,15 @@ defmodule Ecto.Adapters.Mnesia do
     case in_transaction?(meta) do
       true ->
         # mnesia atomic operations (write, etc) always end with :ok or interrupts with exceptions
-        {:atomic, fun.()}
+        try do
+          {:atomic, fun.()}
+        catch
+          :exit, {:aborted, reason} ->
+            {:aborted, reason}
+
+          :exit, reason ->
+              {:aborted, reason}
+        end
 
       false ->
         :mnesia.transaction(fun)
@@ -603,8 +611,8 @@ defmodule Ecto.Adapters.Mnesia do
       nil ->
         do_insert(params, context)
 
-      _conflict ->
-        :mnesia.abort("Record already exists")
+      {_rec, constraints} ->
+        :mnesia.abort(constraints)
     end
   end
 
@@ -613,7 +621,7 @@ defmodule Ecto.Adapters.Mnesia do
       nil ->
         do_insert(params, context)
 
-      _conflict ->
+      {_rec, _constraints} ->
         [Record.to_record(params, context)]
     end
   end
@@ -631,7 +639,7 @@ defmodule Ecto.Adapters.Mnesia do
           nil ->
             do_insert(params, context)
 
-          conflict ->
+          {conflict, _constraints} ->
             orig = Record.to_keyword(conflict, context)
             new = Record.gen_id(params, context)
 
@@ -661,10 +669,10 @@ defmodule Ecto.Adapters.Mnesia do
       nil ->
         nil
 
-      id ->
-        case :mnesia.read(context.table_name, id, :read) do
+      {key, value} ->
+        case :mnesia.read(context.table_name, value, :read) do
           [] -> nil
-          [rec] -> rec
+          [rec] -> {rec, [unique: "#{context.table_name}_#{key}_index"]}
         end
     end
   end

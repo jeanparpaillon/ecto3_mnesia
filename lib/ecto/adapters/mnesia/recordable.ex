@@ -31,7 +31,7 @@ defprotocol Ecto.Adapters.Mnesia.Recordable do
   @doc """
   Return key from parameters, for given schema
   """
-  @spec key(t(), Keyword.t(), Record.context()) :: term() | nil
+  @spec key(t(), Keyword.t(), Record.context()) :: {atom(), term()} | nil
   def key(struct, params, context)
 end
 
@@ -63,7 +63,7 @@ defimpl Ecto.Adapters.Mnesia.Recordable, for: Any do
 
   def key(%{__struct__: schema}, params, _context) do
     case apply(schema, :__schema__, [:primary_key]) do
-      [key] -> params[key]
+      [key] -> {key, params[key]}
       _ -> nil
     end
   end

@@ -41,7 +41,7 @@ defmodule Ecto.Adapters.Mnesia.Record do
     context |> loaded() |> Recordable.load(record, context)
   end
 
-  @spec key(Keyword.t(), context()) :: term() | nil
+  @spec key(Keyword.t(), context()) :: {atom(), term()} | nil
   def key(params, context) do
     context |> loaded() |> Recordable.key(params, context)
   end
