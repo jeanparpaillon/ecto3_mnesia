@@ -99,7 +99,6 @@ defmodule Ecto.Adapters.Mnesia do
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Record
-  alias Ecto.Adapters.Mnesia.Table
 
   require Logger
 
@@ -333,16 +332,8 @@ defmodule Ecto.Adapters.Mnesia do
            fn -> upsert(context, params, on_conflict) end
          ]) do
       {time, {:atomic, [record]}} ->
-        result =
-          returning
-          |> Enum.map(fn field ->
-            {field, Record.attribute(record, field, context)}
-          end)
-
-        # IO.inspect({record, returning, result}, label: "{RECORD, RET, RES}")
-
+        result = Record.select(record, returning, context)
         Logger.debug("QUERY OK source=#{inspect(schema_meta.source)} type=insert db=#{time}µs")
-
         {:ok, result}
 
       {time, {:aborted, error}} ->
@@ -399,9 +390,9 @@ defmodule Ecto.Adapters.Mnesia do
       {time, {:atomic, created_records}} ->
         result =
           Enum.map(created_records, fn [record] ->
-            Enum.map(returning, fn field ->
-              Record.attribute(record, field, context)
-            end)
+            record
+            |> Record.select(returning, context)
+            |> Enum.map(&elem(&1, 1))
           end)
 
         Logger.debug(
@@ -456,19 +447,15 @@ defmodule Ecto.Adapters.Mnesia do
              fn ->
                update =
                  List.zip([schema.__schema__(:fields), attributes])
-                 |> Record.build(record_context)
-                 |> Record.put_change(params, record_context)
+                 |> Record.update(params, record_context)
+                 |> Record.to_record(record_context)
 
                with :ok <- :mnesia.write(table_name, update, :write) do
                  update
                end
              end
            ]) do
-      result =
-        returning
-        |> Enum.map(fn field ->
-          {field, Record.attribute(update, field, record_context)}
-        end)
+      result = Record.select(update, returning, record_context)
 
       Logger.debug(
         "QUERY OK source=#{inspect(source)} type=update db=#{selectTime + updateTime}µs"
@@ -623,12 +610,14 @@ defmodule Ecto.Adapters.Mnesia do
         do_insert(params, context)
 
       _conflict ->
-        [Record.build(params, context)]
+        [Record.to_record(params, context)]
     end
   end
 
   defp upsert(context, params, {fields, [], []}) when is_list(fields) do
-    case Table.attributes(context.table_name) -- fields do
+    all_fields = context.schema_meta.schema.__schema__(:fields)
+
+    case all_fields -- fields do
       [] ->
         # ie replace_all
         do_insert(params, context)
@@ -639,11 +628,13 @@ defmodule Ecto.Adapters.Mnesia do
             do_insert(params, context)
 
           conflict ->
+            orig = Record.to_keyword(conflict, context)
+            new = Record.gen_id(params, context)
+
             record =
-              params
-              |> Record.gen_id(context)
-              |> Record.merge(conflict, context, fields)
-              |> Record.build(context)
+              orig
+              |> Record.update(new, fields, context)
+              |> Record.to_record(context)
 
             with :ok <- :mnesia.write(context.table_name, record, :write), do: [record]
         end
@@ -654,14 +645,14 @@ defmodule Ecto.Adapters.Mnesia do
     record =
       params
       |> Record.gen_id(context)
-      |> Record.build(context)
+      |> Record.to_record(context)
 
     with :ok <- :mnesia.write(context.table_name, record, :write), do: [record]
   end
 
   defp conflict?(params, context) do
     params
-    |> Record.id(context)
+    |> Record.key(context)
     |> case do
       nil ->
         nil
