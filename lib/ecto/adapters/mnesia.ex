@@ -96,6 +96,8 @@ defmodule Ecto.Adapters.Mnesia do
 
   @ecto_vsn :ecto |> Application.spec(:vsn) |> to_string()
 
+  import Ecto.Query
+
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Record
@@ -343,7 +345,7 @@ defmodule Ecto.Adapters.Mnesia do
           }"
         )
 
-        {:invalid, [mnesia: inspect(error)]}
+        {:invalid, error}
     end
   end
 
@@ -543,7 +545,11 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Transaction
   def rollback(_adapter_meta, value) do
-    throw(:mnesia.abort(value))
+    if :mnesia.is_transaction() do
+      throw(:mnesia.abort(value))
+    else
+      raise "not inside transaction"
+    end
   end
 
   @impl Ecto.Adapter.Storage
@@ -587,7 +593,15 @@ defmodule Ecto.Adapters.Mnesia do
     case in_transaction?(meta) do
       true ->
         # mnesia atomic operations (write, etc) always end with :ok or interrupts with exceptions
-        {:atomic, fun.()}
+        try do
+          {:atomic, fun.()}
+        catch
+          :exit, {:aborted, reason} ->
+            {:aborted, reason}
+
+          :exit, reason ->
+            {:aborted, reason}
+        end
 
       false ->
         :mnesia.transaction(fun)
@@ -599,8 +613,8 @@ defmodule Ecto.Adapters.Mnesia do
       nil ->
         do_insert(params, context)
 
-      _conflict ->
-        :mnesia.abort("Record already exists")
+      {_rec, constraints} ->
+        :mnesia.abort(constraints)
     end
   end
 
@@ -609,7 +623,7 @@ defmodule Ecto.Adapters.Mnesia do
       nil ->
         do_insert(params, context)
 
-      _conflict ->
+      {_rec, _constraints} ->
         [Record.to_record(params, context)]
     end
   end
@@ -627,8 +641,8 @@ defmodule Ecto.Adapters.Mnesia do
           nil ->
             do_insert(params, context)
 
-          conflict ->
-            orig = Record.to_keyword(conflict, context)
+          {conflict, _constraints} ->
+            orig = conflict |> Map.from_struct() |> Enum.into([])
             new = Record.gen_id(params, context)
 
             record =
@@ -650,17 +664,33 @@ defmodule Ecto.Adapters.Mnesia do
     with :ok <- :mnesia.write(context.table_name, record, :write), do: [record]
   end
 
-  defp conflict?(params, context) do
+  defp conflict?(params, %{adapter_meta: %{repo: repo}} = context) do
     params
-    |> Record.key(context)
+    |> Record.uniques(context)
     |> case do
-      nil ->
+      [] ->
         nil
 
-      id ->
-        case :mnesia.read(context.table_name, id, :read) do
-          [] -> nil
-          [rec] -> rec
+      uniques ->
+        context.schema_meta.schema
+        |> from()
+        |> where(^uniques)
+        |> repo.one()
+        |> case do
+          nil ->
+            nil
+
+          conflict ->
+            constraints =
+              uniques
+              |> Enum.reduce([], fn {key, value}, acc ->
+                case Map.get(conflict, key) do
+                  ^value -> [{:unique, "#{context.table_name}_#{key}_index"} | acc]
+                  _ -> acc
+                end
+              end)
+
+            {conflict, constraints}
         end
     end
   end

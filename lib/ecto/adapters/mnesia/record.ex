@@ -41,9 +41,17 @@ defmodule Ecto.Adapters.Mnesia.Record do
     context |> loaded() |> Recordable.load(record, context)
   end
 
-  @spec key(Keyword.t(), context()) :: term() | nil
-  def key(params, context) do
-    context |> loaded() |> Recordable.key(params, context)
+  @spec uniques(Keyword.t(), context()) :: [{atom(), term()}]
+  def uniques(params, context) do
+    keys = apply(context.schema_meta.schema, :__schema__, [:primary_key])
+
+    keys
+    |> Enum.reduce([], fn key, acc ->
+      case Keyword.fetch(params, key) do
+        {:ok, value} -> [{key, value} | acc]
+        :error -> acc
+      end
+    end)
   end
 
   @spec update(orig :: Keyword.t(), new :: Keyword.t(), replace :: list() | :all, context()) ::
