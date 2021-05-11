@@ -1,21 +1,6 @@
 defmodule Ecto.Adapters.Mnesia.Qlc.Context do
   @moduledoc false
 
-  defmodule Source do
-    defstruct table: nil, schema: nil, loaded: nil, info: nil
-
-    @type t :: %__MODULE__{}
-
-    def new({table, schema}) do
-      %__MODULE__{
-        table: table,
-        info: :mnesia.table_info(table, :all),
-        schema: schema,
-        loaded: apply(schema, :__schema__, [:loaded])
-      }
-    end
-  end
-
   alias Ecto.Adapters.Mnesia.Record
 
   defstruct sources: [], params: [], qualifiers: [], joins: [], bindings: [], index: 0
@@ -23,7 +8,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc.Context do
   @type t :: %__MODULE__{}
 
   def new(sources) do
-    %__MODULE__{sources: Enum.map(sources, &Source.new/1)}
+    %__MODULE__{sources: sources}
   end
 
   def add_binding(context, {field, source}, value) do

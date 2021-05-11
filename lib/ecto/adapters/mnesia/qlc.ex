@@ -4,6 +4,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
 
   alias Ecto.Adapters.Mnesia.Qlc.Context
   alias Ecto.Adapters.Mnesia.Record
+  alias Ecto.Adapters.Mnesia.Source
   alias Ecto.Adapters.Mnesia.Table
   alias Ecto.Query.BooleanExpr
   alias Ecto.Query.QueryExpr
@@ -14,7 +15,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     desc: :descending
   }
 
-  @spec query(%SelectExpr{} | :all, any(), list(tuple())) ::
+  @spec query(%SelectExpr{} | :all, any(), [Source.t()]) ::
           (list() -> (params :: list() -> query_handle :: :qlc.query_handle()))
   def query(select, joins, sources) do
     context = Context.new(sources)

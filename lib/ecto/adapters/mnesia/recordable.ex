@@ -5,6 +5,7 @@ defprotocol Ecto.Adapters.Mnesia.Recordable do
   @fallback_to_any true
 
   alias Ecto.Adapters.Mnesia.Record
+  alias Ecto.Adapters.Mnesia.Source
 
   @doc """
   Returns record name for the given schema.
@@ -17,7 +18,7 @@ defprotocol Ecto.Adapters.Mnesia.Recordable do
 
   Struct allows for identifying schema, and contain no useful data.
   """
-  @spec load(struct, Record.t(), Record.context()) :: Enumerable.t()
+  @spec load(struct, Record.t(), Source.t()) :: Enumerable.t()
   def load(struct, record, context)
 
   @doc """
@@ -25,7 +26,7 @@ defprotocol Ecto.Adapters.Mnesia.Recordable do
 
   Struct allows for identifying schema, and contain no useful data.
   """
-  @spec dump(t(), Keyword.t(), Record.context()) :: list()
+  @spec dump(t(), Keyword.t(), Source.t()) :: list()
   def dump(struct, params, context)
 end
 
@@ -34,7 +35,7 @@ defimpl Ecto.Adapters.Mnesia.Recordable, for: Any do
 
   def record_name(%{__struct__: schema}), do: schema
 
-  def load(_struct, record, %{table_name: table_name}) do
+  def load(_struct, record, %{table: table_name}) do
     field_names = Table.attributes(table_name)
 
     field_values =
@@ -45,8 +46,7 @@ defimpl Ecto.Adapters.Mnesia.Recordable, for: Any do
     Enum.zip([field_names, field_values])
   end
 
-  @spec dump(any, any, %{:table_name => atom, optional(any) => any}) :: list
-  def dump(_struct, params, %{table_name: table_name}) do
+  def dump(_struct, params, %{table: table_name}) do
     Table.attributes(table_name)
     |> Enum.map(fn attribute ->
       case Keyword.fetch(params, attribute) do

@@ -6,6 +6,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
     ]
 
   alias Ecto.Adapters.Mnesia
+  alias Ecto.Adapters.Mnesia.Source
   alias Ecto.Query.QueryExpr
   require Qlc
 
@@ -20,7 +21,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
   @type t :: %__MODULE__{
           original: Ecto.Query.t(),
           type: :all | :update_all | :delete_all,
-          sources: Keyword.t(),
+          sources: [Source.t()],
           query: (params :: list() -> query_handle :: :qlc.query_handle()),
           sort: (query_handle :: :qlc.query_handle() -> query_handle :: :qlc.query_handle()),
           answers: (query_handle :: :qlc.query_handle(), context :: Keyword.t() -> list(tuple())),
@@ -62,18 +63,16 @@ defmodule Ecto.Adapters.Mnesia.Query do
   defp sources(sources) do
     sources
     |> Tuple.to_list()
-    |> Enum.map(fn {table_name, schema, _} ->
-      {String.to_atom(table_name), schema}
-    end)
+    |> Enum.map(&Source.new/1)
   end
 
-  defp new_record({table_name, schema}, updates) do
+  defp new_record(%Source{table: table, schema: schema}, updates) do
     fn record, params ->
       case updates do
         [%QueryExpr{expr: [set: replacements]}] ->
           replacements
           |> Enum.reduce(record, fn {field, {:^, [], [param_index]}}, record ->
-            record_field_index = record_field_index(field, table_name)
+            record_field_index = record_field_index(field, table)
             value = Enum.at(params, param_index)
             List.replace_at(record, record_field_index, value)
           end)
