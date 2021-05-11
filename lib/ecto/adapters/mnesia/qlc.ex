@@ -34,37 +34,8 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     select = select(select, sources)
 
     fn
-      [%BooleanExpr{}] = wheres ->
-        fn params ->
-          context =
-            %{sources: sources, params: params}
-            |> Context.new()
-            |> qualifiers(wheres)
-            |> joins(joins)
-
-          comprehension =
-            [select, Enum.join(context.joins, ", "), Enum.join(context.qualifiers, ", ")]
-            |> Enum.reject(fn component -> String.length(component) == 0 end)
-            |> Enum.join(", ")
-
-          Qlc.q("[#{comprehension}]", context.bindings)
-        end
-
-      filters ->
-        fn params ->
-          context =
-            %{sources: sources, params: params}
-            |> Context.new()
-            |> qualifiers(filters)
-            |> joins(joins)
-
-          comprehension =
-            [select, Enum.join(context.joins, ", "), Enum.join(context.qualifiers, ", ")]
-            |> Enum.reject(fn component -> String.length(component) == 0 end)
-            |> Enum.join(", ")
-
-          Qlc.q("[#{comprehension}]", context.bindings)
-        end
+      [%BooleanExpr{}] = wheres -> build_query(select, joins, sources, wheres)
+      filters -> build_query(select, joins, sources, filters)
     end
   end
 
@@ -102,6 +73,23 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
 
       :qlc.next_answers(cursor.c, limit)
       |> :qlc.e()
+    end
+  end
+
+  defp build_query(select, joins, sources, filters) do
+    fn params ->
+      context =
+        %{sources: sources, params: params}
+        |> Context.new()
+        |> qualifiers(filters)
+        |> joins(joins)
+
+      comprehension =
+        [select, Enum.join(context.joins, ", "), Enum.join(context.qualifiers, ", ")]
+        |> Enum.reject(fn component -> String.length(component) == 0 end)
+        |> Enum.join(", ")
+
+      Qlc.q("[#{comprehension}]", context.bindings)
     end
   end
 
