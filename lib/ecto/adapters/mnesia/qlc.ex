@@ -2,26 +2,12 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   @moduledoc false
   require Qlc
 
+  alias Ecto.Adapters.Mnesia.Qlc.Context
   alias Ecto.Adapters.Mnesia.Record
   alias Ecto.Adapters.Mnesia.Table
   alias Ecto.Query.BooleanExpr
   alias Ecto.Query.QueryExpr
   alias Ecto.Query.SelectExpr
-
-  defmodule Context do
-    @moduledoc false
-
-    defstruct sources: [], params: [], qualifiers: [], joins: [], bindings: [], index: 0
-
-    def new(%{sources: _, params: _} = args), do: struct(__MODULE__, args)
-
-    def add_binding(context, {field, source}, value) do
-      erl_var = Record.Attributes.to_erl_var(field, source)
-      bind_var = :"B#{context.index}_#{erl_var}"
-      bindings = [{bind_var, value} | context.bindings]
-      {erl_var, bind_var, %{context | index: context.index + 1, bindings: bindings}}
-    end
-  end
 
   @order_mapping %{
     asc: :ascending,
@@ -31,11 +17,11 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   @spec query(%SelectExpr{} | :all, any(), list(tuple())) ::
           (list() -> (params :: list() -> query_handle :: :qlc.query_handle()))
   def query(select, joins, sources) do
-    select = select(select, sources)
+    context = Context.new(sources)
 
     fn
-      [%BooleanExpr{}] = wheres -> build_query(select, joins, sources, wheres)
-      filters -> build_query(select, joins, sources, filters)
+      [%BooleanExpr{}] = wheres -> build_query(select, joins, wheres, context)
+      filters -> build_query(select, joins, filters, context)
     end
   end
 
@@ -46,12 +32,14 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   end
 
   def sort(order_bys, select, sources) do
+    context = Context.new(sources)
+
     fn query ->
       Enum.reduce(order_bys, query, fn
         %QueryExpr{expr: expr}, query1 ->
           Enum.reduce(expr, query1, fn {order, field_expr}, query2 ->
-            field = field(field_expr, sources)
-            field_index = Enum.find_index(fields(select, sources), fn e -> e == field end)
+            field = field(field_expr, context)
+            field_index = Enum.find_index(fields(select, context), fn e -> e == field end)
 
             Qlc.keysort(query2, field_index, order: @order_mapping[order])
           end)
@@ -76,11 +64,12 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     end
   end
 
-  defp build_query(select, joins, sources, filters) do
+  defp build_query(select, joins, filters, context) do
+    select = select(select, context)
+
     fn params ->
       context =
-        %{sources: sources, params: params}
-        |> Context.new()
+        %{context | params: params}
         |> qualifiers(filters)
         |> joins(joins)
 
@@ -109,34 +98,34 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
 
   defp unbind_offset(%QueryExpr{expr: offset}, _context) when is_integer(offset), do: offset
 
-  defp select(select, sources) do
-    fields = fields(select, sources)
+  defp select(select, context) do
+    fields = fields(select, context)
 
     "{#{Enum.join(fields, ", ")}} || " <>
-      (Enum.map(sources, fn {table_name, _schema} = source ->
-         "#{record_pattern(source)} <- mnesia:table('#{table_name}')"
+      (Enum.map(context.sources, fn source ->
+         "#{record_pattern(source)} <- mnesia:table('#{source.table}')"
        end)
        |> Enum.join(", "))
   end
 
-  defp fields(%SelectExpr{fields: fields}, sources) do
-    Enum.flat_map(sources, fn _source ->
-      Enum.map(fields, &field(&1, sources))
+  defp fields(%SelectExpr{fields: fields}, context) do
+    Enum.flat_map(context.sources, fn _source ->
+      Enum.map(fields, &field(&1, context))
       |> Enum.reject(&is_nil(&1))
     end)
   end
 
-  defp fields(:all, [{_table_name, schema} = source | _t]) do
-    schema.__schema__(:fields)
+  defp fields(:all, %{sources: [source | _t]}) do
+    source.schema.__schema__(:fields)
     |> Enum.map(&Record.Attributes.to_erl_var(&1, source))
   end
 
-  defp fields(_, [{_table_name, schema} = source | _t]) do
-    schema.__schema__(:fields)
+  defp fields(_, %{sources: [source | _t]}) do
+    source.schema.__schema__(:fields)
     |> Enum.map(&Record.Attributes.to_erl_var(&1, source))
   end
 
-  defp field({{_, _, [{:&, [], [source_index]}, field]}, [], []}, sources) do
+  defp field({{_, _, [{:&, [], [source_index]}, field]}, [], []}, %{sources: sources}) do
     case Enum.at(sources, source_index) do
       source -> Record.Attributes.to_erl_var(field, source)
     end
@@ -173,8 +162,8 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     "{#{Enum.join(record_pattern_attributes(source), ", ")}}"
   end
 
-  defp record_pattern_attributes({table_name, _schema} = source) do
-    Table.attributes(table_name)
+  defp record_pattern_attributes(source) do
+    Table.attributes(source.table)
     |> Enum.map(fn attribute -> Record.Attributes.to_erl_var(attribute, source) end)
     |> List.insert_at(0, "Schema")
   end

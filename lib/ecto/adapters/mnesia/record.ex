@@ -106,11 +106,13 @@ defmodule Ecto.Adapters.Mnesia.Record do
   defmodule Attributes do
     @moduledoc false
 
+    alias Ecto.Adapters.Mnesia.Qlc.Context
+
     @type t :: list()
 
-    @spec to_erl_var(attribute :: atom(), source :: tuple()) :: erl_var :: String.t()
-    def to_erl_var(attribute, {_table_name, schema}) do
-      (schema |> to_string() |> String.split(".") |> List.last()) <>
+    @spec to_erl_var(attribute :: atom(), Context.Source.t()) :: erl_var :: String.t()
+    def to_erl_var(attribute, source) do
+      (source.schema |> to_string() |> String.split(".") |> List.last()) <>
         (attribute |> Atom.to_string() |> String.capitalize())
     end
   end
