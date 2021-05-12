@@ -107,9 +107,8 @@ defmodule Ecto.Adapters.Mnesia.Record do
     @type t :: list()
 
     @spec to_erl_var(attribute :: atom(), Source.t()) :: erl_var :: String.t()
-    def to_erl_var(attribute, source) do
-      (source.schema |> to_string() |> String.split(".") |> List.last()) <>
-        (attribute |> Atom.to_string() |> String.capitalize())
+    def to_erl_var(attribute, %{schema_erl_prefix: prefix}) do
+      prefix <> "_" <> (attribute |> to_string() |> String.capitalize())
     end
   end
 end

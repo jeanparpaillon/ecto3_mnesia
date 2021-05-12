@@ -5,7 +5,8 @@ defmodule Ecto.Adapters.Mnesia.Source do
             loaded: nil,
             info: nil,
             autogenerate_id: nil,
-            index: %{}
+            index: %{},
+            schema_erl_prefix: nil
 
   @type t :: %__MODULE__{}
 
@@ -25,13 +26,16 @@ defmodule Ecto.Adapters.Mnesia.Source do
         Map.put(acc, a, i + 1)
       end)
 
+    schema_erl_prefix = schema |> to_string() |> String.replace(".", "_")
+
     %__MODULE__{
       table: table,
       schema: schema,
       loaded: apply(schema, :__schema__, [:loaded]),
       info: table_info,
       autogenerate_id: schema_meta[:autogenerate_id],
-      index: index
+      index: index,
+      schema_erl_prefix: schema_erl_prefix
     }
   end
 end
