@@ -560,13 +560,10 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      case TestRepo.all(from(s in TestSchema, order_by: [desc: :field])) do
-        [%{id: 2, field: "field 3"}, %{id: 1, field: "field 2"}, %{id: 3, field: "field 1"}] ->
-          assert true
+      ret = TestRepo.all(from(s in TestSchema, order_by: [desc: :field]))
 
-        e ->
-          assert e == false
-      end
+      assert [%{id: 2, field: "field 3"}, %{id: 1, field: "field 2"}, %{id: 3, field: "field 1"}] =
+               ret
 
       :mnesia.clear_table(@table_name)
     end

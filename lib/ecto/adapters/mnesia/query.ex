@@ -65,7 +65,9 @@ defmodule Ecto.Adapters.Mnesia.Query do
   defp new_record(source, updates) do
     fn tuple, params ->
       record = Record.new(tuple, source)
-      params = params |> Enum.with_index() |> Enum.reduce(%{}, fn {p, i}, acc -> Map.put(acc, i, p) end)
+
+      params =
+        params |> Enum.with_index() |> Enum.reduce(%{}, fn {p, i}, acc -> Map.put(acc, i, p) end)
 
       case updates do
         [%QueryExpr{expr: [set: replacements]}] ->
