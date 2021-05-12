@@ -14,7 +14,7 @@ defmodule Ecto.Adapters.Mnesia.Record do
     Tuple.insert_at(data, 0, elem(pattern, 0))
   end
 
-  def new(struct, source) when is_struct(struct) do
+  def new(%{__struct__: _} = struct, source) do
     struct |> Map.from_struct() |> Map.drop([:__meta__]) |> new(source)
   end
 
