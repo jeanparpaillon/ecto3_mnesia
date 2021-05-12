@@ -327,11 +327,11 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def insert(adapter_meta, schema_meta, params, on_conflict, returning, _opts) do
-    source = Source.new(schema_meta, adapter_meta)
+    source = Source.new(schema_meta)
 
     case :timer.tc(&mnesia_transaction_wrapper/2, [
            adapter_meta,
-           fn -> upsert(source, params, on_conflict) end
+           fn -> upsert(source, params, on_conflict, adapter_meta) end
          ]) do
       {time, {:atomic, [record]}} ->
         result = Record.select(record, returning, source)
@@ -373,13 +373,13 @@ defmodule Ecto.Adapters.Mnesia do
         returning,
         _opts
       ) do
-    source = Source.new(schema_meta, adapter_meta)
+    source = Source.new(schema_meta)
 
     case :timer.tc(&mnesia_transaction_wrapper/2, [
            adapter_meta,
            fn ->
              Enum.map(records, fn params ->
-               upsert(source, params, on_conflict)
+               upsert(source, params, on_conflict, adapter_meta)
              end)
            end
          ]) do
@@ -417,7 +417,7 @@ defmodule Ecto.Adapters.Mnesia do
         returning,
         _opts
       ) do
-    source = Source.new(schema_meta, adapter_meta)
+    source = Source.new(schema_meta)
     answers_context = [params: params]
     query = Mnesia.Qlc.query(:all, [], [source]).(filters)
 
@@ -468,7 +468,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def delete(adapter_meta, schema_meta, filters, _opts) do
-    source = Source.new(schema_meta, adapter_meta)
+    source = Source.new(schema_meta)
     query = Mnesia.Qlc.query(:all, [], [source]).(filters)
 
     with {selectTime, {:atomic, [[id | _t]]}} <-
@@ -586,8 +586,8 @@ defmodule Ecto.Adapters.Mnesia do
     end
   end
 
-  defp upsert(source, params, {:raise, [], []}) do
-    case conflict?(params, source) do
+  defp upsert(source, params, {:raise, [], []}, adapter_meta) do
+    case conflict?(params, source, adapter_meta) do
       nil ->
         do_insert(params, source)
 
@@ -596,8 +596,8 @@ defmodule Ecto.Adapters.Mnesia do
     end
   end
 
-  defp upsert(source, params, {:nothing, [], []}) do
-    case conflict?(params, source) do
+  defp upsert(source, params, {:nothing, [], []}, adapter_meta) do
+    case conflict?(params, source, adapter_meta) do
       nil ->
         do_insert(params, source)
 
@@ -606,7 +606,7 @@ defmodule Ecto.Adapters.Mnesia do
     end
   end
 
-  defp upsert(source, params, {fields, [], []}) when is_list(fields) do
+  defp upsert(source, params, {fields, [], []}, adapter_meta) when is_list(fields) do
     all_fields = source.schema.__schema__(:fields)
 
     case all_fields -- fields do
@@ -615,7 +615,7 @@ defmodule Ecto.Adapters.Mnesia do
         do_insert(params, source)
 
       _ ->
-        case conflict?(params, source) do
+        case conflict?(params, source, adapter_meta) do
           nil ->
             do_insert(params, source)
 
@@ -642,7 +642,7 @@ defmodule Ecto.Adapters.Mnesia do
     with :ok <- :mnesia.write(source.table, record, :write), do: [record]
   end
 
-  defp conflict?(params, %{adapter_meta: %{repo: repo}} = source) do
+  defp conflict?(params, source, %{repo: repo}) do
     params
     |> Record.uniques(source)
     |> case do
