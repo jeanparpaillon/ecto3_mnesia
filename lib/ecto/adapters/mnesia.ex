@@ -196,8 +196,7 @@ defmodule Ecto.Adapters.Mnesia do
            fn ->
              query.(params)
              |> answers.(answers_context)
-             |> Enum.map(&Tuple.to_list(&1))
-             |> Enum.map(fn record -> new_record.(record, params) end)
+             |> Enum.map(&new_record.(&1, params))
              |> Enum.map(fn record ->
                with :ok <- :mnesia.write(source.table, record, :write) do
                  Record.to_schema(record, source)
@@ -246,10 +245,11 @@ defmodule Ecto.Adapters.Mnesia do
            fn ->
              query.(params)
              |> answers.(context)
-             |> Enum.map(&Tuple.to_list(&1))
-             |> Enum.map(fn record ->
-               :mnesia.delete(source.table, List.first(record), :write)
-               record
+             |> Enum.map(fn tuple ->
+               # Works only if query selects id at first, see: https://gitlab.com/patatoid/ecto3_mnesia/-/issues/15
+               id = elem(tuple, 0)
+               :mnesia.delete(source.table, id, :write)
+               Tuple.to_list(tuple)
              end)
            end
          ]) do
@@ -351,28 +351,14 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   if Version.compare(@ecto_vsn, "3.6.0") in [:eq, :gt] do
-    def insert_all(
-          adapter_meta,
-          schema,
-          header,
-          records,
-          on_conflict,
-          returning,
-          _placeholders,
-          opts
-        ),
-        do: insert_all(adapter_meta, schema, header, records, on_conflict, returning, opts)
+    def insert_all(adapter_meta, schema, header, records, on_conflict, returning, [], opts),
+      do: insert_all(adapter_meta, schema, header, records, on_conflict, returning, opts)
+
+    def insert_all(_, _, _, _, _, _, _placeholders, _),
+      do: raise(ArgumentError, ":placeholders is not supported by mnesia")
   end
 
-  def insert_all(
-        adapter_meta,
-        schema_meta,
-        _header,
-        records,
-        on_conflict,
-        returning,
-        _opts
-      ) do
+  def insert_all(adapter_meta, schema_meta, _header, records, on_conflict, returning, _opts) do
     source = Source.new(schema_meta)
 
     case :timer.tc(&mnesia_transaction_wrapper/2, [
@@ -409,14 +395,7 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   @impl Ecto.Adapter.Schema
-  def update(
-        adapter_meta,
-        %{schema: schema} = schema_meta,
-        params,
-        filters,
-        returning,
-        _opts
-      ) do
+  def update(adapter_meta, schema_meta, params, filters, returning, _opts) do
     source = Source.new(schema_meta)
     answers_context = [params: params]
     query = Mnesia.Qlc.query(:all, [], [source]).(filters)
@@ -432,13 +411,13 @@ defmodule Ecto.Adapters.Mnesia do
            :timer.tc(&mnesia_transaction_wrapper/2, [
              adapter_meta,
              fn ->
-               update =
-                 List.zip([schema.__schema__(:fields), attributes])
+               updated =
+                 attributes
+                 |> Record.new(source)
                  |> Record.update(params, source)
-                 |> Record.to_record(source)
 
-               with :ok <- :mnesia.write(source.table, update, :write) do
-                 update
+               with :ok <- :mnesia.write(source.table, updated, :write) do
+                 updated
                end
              end
            ]) do
@@ -602,7 +581,7 @@ defmodule Ecto.Adapters.Mnesia do
         do_insert(params, source)
 
       {_rec, _constraints} ->
-        [Record.to_record(params, source)]
+        [Record.new(params, source)]
     end
   end
 
@@ -620,15 +599,8 @@ defmodule Ecto.Adapters.Mnesia do
             do_insert(params, source)
 
           {conflict, _constraints} ->
-            orig = conflict |> Map.from_struct() |> Enum.into([])
-            new = Record.gen_id(params, source)
-
-            record =
-              orig
-              |> Record.update(new, fields, source)
-              |> Record.to_record(source)
-
-            with :ok <- :mnesia.write(source.table, record, :write), do: [record]
+            updated = conflict |> Record.new(source) |> Record.update(params, source, fields)
+            with :ok <- :mnesia.write(source.table, updated, :write), do: [updated]
         end
     end
   end
@@ -637,7 +609,7 @@ defmodule Ecto.Adapters.Mnesia do
     record =
       params
       |> Record.gen_id(source)
-      |> Record.to_record(source)
+      |> Record.new(source)
 
     with :ok <- :mnesia.write(source.table, record, :write), do: [record]
   end

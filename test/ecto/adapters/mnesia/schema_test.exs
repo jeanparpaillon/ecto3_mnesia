@@ -40,18 +40,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       |> Ecto.Changeset.cast(params, [:field])
     end
 
-    defimpl Ecto.Adapters.Mnesia.Recordable do
-      def record_name(_s), do: :alt_record
-
-      def load(struct, record, context),
-        do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).load(struct, record, context)
-
-      def dump(struct, params, context),
-        do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).dump(struct, params, context)
-
-      def key(struct, params, context),
-        do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).key(struct, params, context)
-    end
+    def __record_name__, do: :alt_record
   end
 
   defmodule ArrayTestSchema do
@@ -492,18 +481,11 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       id = record.id
       changeset = TestSchema.changeset(record, %{field: "field updated"})
 
-      case TestRepo.update(changeset) do
-        {:ok, %TestSchema{id: ^id, field: "field updated"}} ->
-          case :mnesia.transaction(fn ->
-                 :mnesia.read(@table_name, id)
-               end) do
-            {:atomic, [{TestSchema, ^id, "field updated", _, _}]} -> assert true
-            e -> assert false == e
-          end
+      ret = TestRepo.update(changeset)
+      assert {:ok, %TestSchema{id: ^id, field: "field updated"}} = ret
 
-        _ ->
-          assert false
-      end
+      ret = :mnesia.transaction(fn -> :mnesia.read(@table_name, id) end)
+      assert {:atomic, [{TestSchema, ^id, "field updated", _, _}]} = ret
 
       :mnesia.clear_table(@table_name)
     end

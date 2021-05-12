@@ -91,7 +91,7 @@ end
 mnesia tables can have record name different from table name. By default, the
 adapter use schema name (module name) as record name. For compatibility with
 existing applications, one can customize record name per schema, by implementing
-the `Ecto.Adapters.Mnesia.Recordable` protocol.
+`__record_name__/0` function in the schema module.
 
 ```
 defmodule MyApp.Schema do
@@ -104,9 +104,7 @@ defmodule MyApp.Schema do
 
   ...
 
-  defimpl Ecto.Adapters.Mnesia.Recordable do
-    def record_name(_s), do: :schema
-  end  
+  def __record_name__, do: :schema
 end
 ```
 

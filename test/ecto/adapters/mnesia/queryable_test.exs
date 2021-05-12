@@ -507,9 +507,11 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      case TestRepo.delete_all(from(t in TestSchema, select: t.id)) do
-        {3, [1, 2, 3]} ->
-          assert true
+      ret = TestRepo.delete_all(from(t in TestSchema, select: t.id))
+      assert {3, [1, 2, 3]} = ret
+
+      for i <- 1..3 do
+        assert [] = :mnesia.dirty_read(@table_name, i)
       end
 
       :mnesia.clear_table(@table_name)

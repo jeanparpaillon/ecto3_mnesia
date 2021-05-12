@@ -1,31 +1,61 @@
 defmodule Ecto.Adapters.Mnesia.Record do
   @moduledoc false
+  alias Ecto.Adapter.Schema
   alias Ecto.Adapters.Mnesia
-  alias Ecto.Adapters.Mnesia.Recordable
   alias Ecto.Adapters.Mnesia.Source
 
   @type t :: tuple()
   @type context :: Source.t()
 
-  @spec to_schema(record :: t(), context()) :: struct()
-  def to_schema(record, %{loaded: loaded} = context) do
-    loaded
-    |> Map.merge(Enum.into(Recordable.load(loaded, record, context), %{}))
+  # new api
+  @spec new(tuple() | Keyword.t() | map() | Ecto.Schema.t(), Source.t()) :: t()
+  def new(data, source) when is_tuple(data) do
+    pattern = source.info.wild_pattern
+    Tuple.insert_at(data, 0, elem(pattern, 0))
   end
 
-  @spec to_record(params :: Keyword.t() | [tuple()], context()) :: record :: t()
-  def to_record(params, %{loaded: loaded} = context) do
-    record_name = Recordable.record_name(loaded)
-
-    loaded
-    |> Recordable.dump(params, context)
-    |> List.insert_at(0, record_name)
-    |> List.to_tuple()
+  def new(struct, source) when is_struct(struct) do
+    struct |> Map.from_struct() |> Map.drop([:__meta__]) |> new(source)
   end
 
-  @spec to_keyword(t(), context()) :: Keyword.t()
-  def to_keyword(record, context) do
-    context.loaded() |> Recordable.load(record, context)
+  def new(data, source) when is_list(data) do
+    data |> Map.new() |> new(source)
+  end
+
+  def new(data, source) when is_map(data) do
+    pattern = source.info.wild_pattern
+
+    source.index
+    |> Enum.reduce(pattern, fn {field, i}, acc ->
+      put_elem(acc, i, Map.get(data, field))
+    end)
+  end
+
+  # new api
+  @spec update(t(), Keyword.t(), Source.t(), [atom()] | :all) :: t()
+  def update(record, params, source, replace \\ :all) do
+    params
+    |> Enum.reduce(record, fn {field, value}, acc ->
+      if replace == :all or Enum.member?(replace, field) do
+        put_elem(acc, source.index[field], value)
+      else
+        acc
+      end
+    end)
+  end
+
+  # new api
+  @spec select(t(), [atom()], Source.t()) :: Schema.fields()
+  def select(record, fields, %{index: index}) do
+    Enum.map(fields, &{&1, elem(record, index[&1])})
+  end
+
+  @spec to_schema(t(), Source.t()) :: Ecto.Schema.t()
+  def to_schema(record, %{loaded: loaded, index: index}) do
+    index
+    |> Enum.reduce(loaded, fn {field, i}, acc ->
+      Map.put(acc, field, elem(record, i))
+    end)
   end
 
   @spec uniques(Keyword.t(), context()) :: [{atom(), term()}]
@@ -41,44 +71,28 @@ defmodule Ecto.Adapters.Mnesia.Record do
     end)
   end
 
-  @spec update(orig :: Keyword.t(), new :: Keyword.t(), replace :: list() | :all, context()) ::
-          Keyword.t()
-  def update(orig, new, replace \\ :all, _context) do
-    orig
-    |> Enum.reduce([], fn {field, old}, acc ->
-      if replace == :all or Enum.member?(replace, field) do
-        case Keyword.fetch(new, field) do
-          {:ok, value} -> Keyword.put(acc, field, value)
-          :error -> Keyword.put(acc, field, old)
-        end
-      else
-        Keyword.put(acc, field, old)
-      end
-    end)
-  end
-
-  @spec select(record :: t(), attributes :: [atom()], context()) :: [term()]
-  def select(record, fields, %{loaded: loaded} = context) do
-    fields = MapSet.new(fields)
-
-    loaded
-    |> Recordable.load(record, context)
-    |> Enum.filter(&Enum.member?(fields, elem(&1, 0)))
-  end
-
   @spec gen_id(Keyword.t(), context()) :: Keyword.t()
-  def gen_id(params, %{loaded: loaded} = context) do
-    case context.autogenerate_id do
+  def gen_id(params, source) do
+    case source.autogenerate_id do
       nil ->
         params
 
-      {_key, source, type} ->
-        if params[source] do
+      {_key, id_source, type} ->
+        if params[id_source] do
           params
         else
-          record_name = loaded |> Recordable.record_name()
-          Keyword.put(params, source, Mnesia.autogenerate({{record_name, source}, type}))
+          record_name = record_name(source)
+          Keyword.put(params, id_source, Mnesia.autogenerate({{record_name, id_source}, type}))
         end
+    end
+  end
+
+  @spec record_name(Source.t()) :: atom()
+  def record_name(%{schema: schema}) do
+    if function_exported?(schema, :__record_name__, 0) do
+      apply(schema, :__record_name__, [])
+    else
+      schema
     end
   end
 
