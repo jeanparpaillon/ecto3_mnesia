@@ -7,7 +7,8 @@ defmodule Ecto.Adapters.Mnesia.Source do
             autogenerate_id: nil,
             index: %{},
             schema_erl_prefix: nil,
-            record_name: nil
+            record_name: nil,
+            wild_pattern: nil
 
   @type t :: %__MODULE__{}
 
@@ -21,6 +22,7 @@ defmodule Ecto.Adapters.Mnesia.Source do
     table_info = table |> :mnesia.table_info(:all) |> Map.new()
 
     record_name = record_name(schema)
+    wild_pattern = :_ |> Tuple.duplicate(length(table_info.attributes)) |> Tuple.insert_at(0, record_name)
 
     index =
       table_info.attributes
@@ -39,7 +41,8 @@ defmodule Ecto.Adapters.Mnesia.Source do
       autogenerate_id: schema_meta[:autogenerate_id],
       index: index,
       schema_erl_prefix: schema_erl_prefix,
-      record_name: record_name
+      record_name: record_name,
+      wild_pattern: wild_pattern
     }
   end
 
