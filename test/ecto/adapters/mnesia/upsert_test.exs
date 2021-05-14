@@ -14,11 +14,11 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
     use Ecto.Schema
 
     schema "#{Ecto.Adapters.Mnesia.UpsertTest.Table}" do
-      timestamps()
-
       field(:field1, :string)
       field(:field2, :string)
       field(:field3, :string)
+
+      timestamps()
     end
 
     def changeset(%TestSchema{} = struct, params) do

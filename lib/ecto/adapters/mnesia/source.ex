@@ -19,16 +19,14 @@ defmodule Ecto.Adapters.Mnesia.Source do
   def new(schema_meta) do
     table = String.to_atom(schema_meta.source)
     schema = schema_meta.schema
-    table_info = table |> :mnesia.table_info(:all) |> Map.new()
 
     record_name = record_name(schema)
-    attributes = table_info.attributes
+    attributes = schema_sources(schema)
 
-    wild_pattern =
-      :_ |> Tuple.duplicate(length(table_info.attributes)) |> Tuple.insert_at(0, record_name)
+    wild_pattern = :_ |> Tuple.duplicate(length(attributes)) |> Tuple.insert_at(0, record_name)
 
     index =
-      table_info.attributes
+      attributes
       |> Enum.with_index()
       |> Enum.reduce(%{}, fn {a, i}, acc ->
         Map.put(acc, a, i + 1)
@@ -84,5 +82,11 @@ defmodule Ecto.Adapters.Mnesia.Source do
     else
       schema
     end
+  end
+
+  defp schema_sources(schema) do
+    schema
+    |> apply(:__schema__, [:fields])
+    |> Enum.map(&schema.__schema__(:field_source, &1))
   end
 end
