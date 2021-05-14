@@ -9,8 +9,7 @@ defmodule Ecto.Adapters.Mnesia.Record do
   # new api
   @spec new(tuple() | Keyword.t() | map() | Ecto.Schema.t(), Source.t()) :: t()
   def new(data, source) when is_tuple(data) do
-    pattern = source.wild_pattern
-    Tuple.insert_at(data, 0, elem(pattern, 0))
+    Tuple.insert_at(data, 0, source.record_name)
   end
 
   def new(%{__struct__: _} = struct, source) do
