@@ -18,9 +18,9 @@ defmodule Ecto.Adapters.Mnesia.Source do
     new(%{source: table, schema: schema})
   end
 
-  def new(schema_meta) do
-    table = String.to_atom(schema_meta.source)
-    schema = schema_meta.schema
+  def new(%{source: table, schema: schema} = meta) do
+    table = String.to_atom(table)
+    schema = schema
     record_name = record_name(schema)
     keys = schema.__schema__(:primary_key)
     loaded = schema.__schema__(:loaded)
@@ -30,7 +30,7 @@ defmodule Ecto.Adapters.Mnesia.Source do
       schema: schema,
       record_name: record_name,
       loaded: loaded,
-      autogenerate_id: schema_meta[:autogenerate_id],
+      autogenerate_id: meta[:autogenerate_id],
       schema_erl_prefix: schema |> to_string() |> String.replace(".", "_")
     }
     |> build_extra_key(keys)
@@ -38,6 +38,10 @@ defmodule Ecto.Adapters.Mnesia.Source do
     |> build_index()
     |> build_default()
     |> build_source_field()
+  end
+
+  def new(%{schema: schema} = meta) do
+    new(Map.put(meta, :source, schema.__schema__(:source)))
   end
 
   @doc false

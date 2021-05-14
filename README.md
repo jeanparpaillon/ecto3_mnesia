@@ -61,30 +61,10 @@ end
 ```
 
 ## Migrations
-Migrations are not supported yet, you can use mnesia abilities to create tables in a script.
-```
-# ./priv/repo/mnesia_migration.exs
-IO.inspect :mnesia.create_table(:table_name, [
-  disc_copies: [node()],
-  record_name: MyApp.Context.Schema,
-  attributes: [:id, :field, :updated_at, :inserted_at],
-  type: :set
-])
-```
-Then run the script with mix `mix run ./priv/repo/mnesia_migration.exs`
 
-Notice that the table before MUST be defined according to the corresponding schema
-```
-defmodule MyApp.Context.Schema do
-  ...
-  schema "table_name" do
-    field :field, :string
-
-    timestamps()
-  end
-  ...
-end
-```
+`Ecto.Adapters.Mnesia.Migration.create_table/2` create mnesia table from an Ecto
+schema module and mnesia specific options. Options like `attributes`, `type` or
+`index` are inferred from schema.
 
 ### Record name
 
@@ -109,7 +89,7 @@ end
 ```
 
 ## Known issues
-- This package makes not a great usage of indices (https://gitlab.com/patatoid/ecto3_mnesia/-/issues/6)
+
 - Delete queries using a select must include primary key (https://gitlab.com/patatoid/ecto3_mnesia/-/issues/9)
 - Ecto 3.6 has introduced the possibility to send `placeholders` when using
   `Repo.insert_all` (see https://github.com/elixir-ecto/ecto_sql/pull/290).
