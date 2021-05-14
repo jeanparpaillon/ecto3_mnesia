@@ -3,12 +3,12 @@ defmodule Ecto.Adapters.Mnesia.Source do
   defstruct table: nil,
             schema: nil,
             loaded: nil,
-            info: nil,
             autogenerate_id: nil,
             index: %{},
             schema_erl_prefix: nil,
             record_name: nil,
-            wild_pattern: nil
+            wild_pattern: nil,
+            attributes: []
 
   @type t :: %__MODULE__{}
 
@@ -22,7 +22,10 @@ defmodule Ecto.Adapters.Mnesia.Source do
     table_info = table |> :mnesia.table_info(:all) |> Map.new()
 
     record_name = record_name(schema)
-    wild_pattern = :_ |> Tuple.duplicate(length(table_info.attributes)) |> Tuple.insert_at(0, record_name)
+    attributes = table_info.attributes
+
+    wild_pattern =
+      :_ |> Tuple.duplicate(length(table_info.attributes)) |> Tuple.insert_at(0, record_name)
 
     index =
       table_info.attributes
@@ -37,17 +40,17 @@ defmodule Ecto.Adapters.Mnesia.Source do
       table: table,
       schema: schema,
       loaded: apply(schema, :__schema__, [:loaded]),
-      info: table_info,
       autogenerate_id: schema_meta[:autogenerate_id],
       index: index,
       schema_erl_prefix: schema_erl_prefix,
       record_name: record_name,
-      wild_pattern: wild_pattern
+      wild_pattern: wild_pattern,
+      attributes: attributes
     }
   end
 
   @doc false
-  def attributes(%{info: %{attributes: attributes}}) do
+  def attributes(%{attributes: attributes}) do
     attributes
   end
 
@@ -58,8 +61,7 @@ defmodule Ecto.Adapters.Mnesia.Source do
 
   @doc false
   def qlc_attributes_pattern(source) do
-    source
-    |> attributes()
+    source.attributes
     |> Enum.map(fn attribute -> to_erl_var(source, attribute) end)
   end
 
