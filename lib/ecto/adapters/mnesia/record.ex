@@ -95,20 +95,4 @@ defmodule Ecto.Adapters.Mnesia.Record do
       schema
     end
   end
-
-  ###
-  ### Priv
-  ###
-  defmodule Attributes do
-    @moduledoc false
-
-    alias Ecto.Adapters.Mnesia.Source
-
-    @type t :: list()
-
-    @spec to_erl_var(attribute :: atom(), Source.t()) :: erl_var :: String.t()
-    def to_erl_var(attribute, %{schema_erl_prefix: prefix}) do
-      prefix <> "_" <> (attribute |> to_string() |> String.capitalize())
-    end
-  end
 end

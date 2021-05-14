@@ -3,7 +3,6 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   require Qlc
 
   alias Ecto.Adapters.Mnesia.Qlc.Context
-  alias Ecto.Adapters.Mnesia.Record
   alias Ecto.Adapters.Mnesia.Source
   alias Ecto.Query.BooleanExpr
   alias Ecto.Query.QueryExpr
@@ -122,17 +121,15 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   end
 
   defp fields(:all, %{sources: [source | _t]}) do
-    source.info.attributes
-    |> Enum.map(&Record.Attributes.to_erl_var(&1, source))
+    Source.qlc_attributes_pattern(source)
   end
 
   defp fields(_, %{sources: [source | _t]}) do
-    source.info.attributes
-    |> Enum.map(&Record.Attributes.to_erl_var(&1, source))
+    Source.qlc_attributes_pattern(source)
   end
 
   defp field({{_, _, [{:&, [], [source_index]}, field]}, [], []}, {source, source_index}) do
-    Record.Attributes.to_erl_var(field, source)
+    Source.to_erl_var(source, field)
   end
 
   defp field(_, _), do: nil
@@ -165,13 +162,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   end
 
   defp record_pattern(source) do
-    "{#{Enum.join(record_pattern_attributes(source), ", ")}}"
-  end
-
-  defp record_pattern_attributes(source) do
-    source.info.attributes
-    |> Enum.map(fn attribute -> Record.Attributes.to_erl_var(attribute, source) end)
-    |> List.insert_at(0, source.schema_erl_prefix)
+    "{#{Enum.join(Source.qlc_record_pattern(source), ", ")}}"
   end
 
   defp to_qlc(true, context), do: {"true", context}
@@ -204,7 +195,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
          context
        ) do
     source = Enum.at(context.sources, source_index)
-    erl_var = Record.Attributes.to_erl_var(field, source)
+    erl_var = Source.to_erl_var(source, field)
     {"#{erl_var} == nil", context}
   end
 
@@ -250,8 +241,8 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
        ) do
     key_source = Enum.at(context.sources, key_source_index)
     value_source = Enum.at(context.sources, value_source_index)
-    erl_var = Record.Attributes.to_erl_var(key_field, key_source)
-    value = Record.Attributes.to_erl_var(value_field, value_source)
+    erl_var = Source.to_erl_var(key_source, key_field)
+    value = Source.to_erl_var(value_source, value_field)
     {"#{erl_var} #{op} #{value}", context}
   end
 

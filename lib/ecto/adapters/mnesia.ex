@@ -586,7 +586,7 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   defp upsert(source, params, {fields, [], []}, adapter_meta) when is_list(fields) do
-    all_fields = source.schema.__schema__(:fields)
+    all_fields = Source.fields(source)
 
     case all_fields -- fields do
       [] ->

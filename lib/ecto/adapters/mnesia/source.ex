@@ -38,4 +38,31 @@ defmodule Ecto.Adapters.Mnesia.Source do
       schema_erl_prefix: schema_erl_prefix
     }
   end
+
+  @doc false
+  def attributes(%{info: %{attributes: attributes}}) do
+    attributes
+  end
+
+  @doc false
+  def fields(%{schema: schema}) do
+    schema.__schema__(:fields)
+  end
+
+  @doc false
+  def qlc_attributes_pattern(source) do
+    source
+    |> attributes()
+    |> Enum.map(fn attribute -> to_erl_var(source, attribute) end)
+  end
+
+  @doc false
+  def qlc_record_pattern(%{schema_erl_prefix: prefix} = source) do
+    [prefix | qlc_attributes_pattern(source)]
+  end
+
+  @doc false
+  def to_erl_var(%{schema_erl_prefix: prefix}, attribute) do
+    prefix <> "_" <> (attribute |> to_string() |> String.capitalize())
+  end
 end
