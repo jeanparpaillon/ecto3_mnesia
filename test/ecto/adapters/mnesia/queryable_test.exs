@@ -452,21 +452,18 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      case TestRepo.update_all(
-             from(s in TestSchema, where: s.id == 1 or s.id == 2),
-             set: [field: "updated field"]
-           ) do
-        {count, records} ->
-          assert count == 2
+      {count, records} =
+        TestRepo.update_all(
+          from(s in TestSchema, where: s.id == 1 or s.id == 2),
+          set: [field: "updated field"]
+        )
 
-          assert Enum.all?(records, fn
-                   %{field: "updated field"} -> true
-                   _ -> false
-                 end)
+      assert 2 == count
 
-        e ->
-          assert e == false
-      end
+      assert Enum.all?(records, fn
+               %{field: "updated field"} -> true
+               _ -> false
+             end)
 
       :mnesia.clear_table(@table_name)
     end

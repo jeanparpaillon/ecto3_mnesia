@@ -13,29 +13,29 @@ defmodule Ecto.Adapters.Mnesia.Record do
   end
 
   def new(%{__struct__: _} = struct, source) do
-    struct |> Map.from_struct() |> Map.drop([:__meta__]) |> new(source)
+    struct
+    |> Map.from_struct()
+    |> Map.drop([:__meta__])
+    |> Enum.map(fn {field, value} -> {source.schema.__schema__(:field_source, field), value} end)
+    |> new(source)
   end
 
-  def new(data, source) when is_list(data) do
-    data |> Map.new() |> new(source)
-  end
-
-  def new(data, source) when is_map(data) do
-    pattern = source.wild_pattern
-
-    source.index
-    |> Enum.reduce(pattern, fn {field, i}, acc ->
-      put_elem(acc, i, Map.get(data, field))
-    end)
+  def new(data, source) when is_list(data) or is_map(data) do
+    pattern = source.default
+    update(pattern, data, source)
   end
 
   # new api
-  @spec update(t(), Keyword.t(), Source.t(), [atom()] | :all) :: t()
+  @spec update(t(), Enumerable.t(), Source.t(), [atom()] | :all) :: t()
   def update(record, params, source, replace \\ :all) do
     params
     |> Enum.reduce(record, fn {field, value}, acc ->
       if replace == :all or Enum.member?(replace, field) do
-        put_elem(acc, source.index[field], value)
+        field_index = source.index[field]
+
+        acc
+        |> put_elem(field_index, value)
+        |> maybe_update_key(field, field_index, source)
       else
         acc
       end
@@ -49,10 +49,10 @@ defmodule Ecto.Adapters.Mnesia.Record do
   end
 
   @spec to_schema(t(), Source.t()) :: Ecto.Schema.t()
-  def to_schema(record, %{loaded: loaded, index: index}) do
+  def to_schema(record, %{loaded: loaded, index: index, source_field: fields}) do
     index
     |> Enum.reduce(loaded, fn {field, i}, acc ->
-      Map.put(acc, field, elem(record, i))
+      Map.put(acc, fields[field], elem(record, i))
     end)
   end
 
@@ -72,6 +72,27 @@ defmodule Ecto.Adapters.Mnesia.Record do
             Mnesia.autogenerate({{source.record_name, id_source}, type})
           )
         end
+    end
+  end
+
+  ###
+  ### Priv
+  ###
+  defp maybe_update_key(record, _field, _field_index, %{extra_key: nil}),
+    do: record
+
+  defp maybe_update_key(record, field, field_index, %{extra_key: extra_key}) do
+    case Map.fetch(extra_key, field) do
+      {:ok, key_index} ->
+        key =
+          record
+          |> elem(1)
+          |> put_elem(key_index, elem(record, field_index))
+
+        put_elem(record, 1, key)
+
+      :error ->
+        record
     end
   end
 end

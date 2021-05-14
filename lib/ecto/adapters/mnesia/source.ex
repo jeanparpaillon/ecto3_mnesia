@@ -3,12 +3,14 @@ defmodule Ecto.Adapters.Mnesia.Source do
   defstruct table: nil,
             schema: nil,
             loaded: nil,
+            default: nil,
             autogenerate_id: nil,
             index: %{},
+            source_field: %{},
             schema_erl_prefix: nil,
             record_name: nil,
-            wild_pattern: nil,
-            attributes: []
+            attributes: [],
+            extra_key: nil
 
   @type t :: %__MODULE__{}
 
@@ -19,43 +21,23 @@ defmodule Ecto.Adapters.Mnesia.Source do
   def new(schema_meta) do
     table = String.to_atom(schema_meta.source)
     schema = schema_meta.schema
-
     record_name = record_name(schema)
-
-    attributes =
-      case schema.__schema__(:primary_key) do
-        [] ->
-          schema_sources(schema)
-
-        [_] ->
-          schema_sources(schema)
-
-        [_, _ | _] ->
-          [:__key__ | schema_sources(schema)]
-      end
-
-    wild_pattern = :_ |> Tuple.duplicate(length(attributes)) |> Tuple.insert_at(0, record_name)
-
-    index =
-      attributes
-      |> Enum.with_index()
-      |> Enum.reduce(%{}, fn {a, i}, acc ->
-        Map.put(acc, a, i + 1)
-      end)
-
-    schema_erl_prefix = schema |> to_string() |> String.replace(".", "_")
+    keys = schema.__schema__(:primary_key)
+    loaded = schema.__schema__(:loaded)
 
     %__MODULE__{
       table: table,
       schema: schema,
-      loaded: apply(schema, :__schema__, [:loaded]),
-      autogenerate_id: schema_meta[:autogenerate_id],
-      index: index,
-      schema_erl_prefix: schema_erl_prefix,
       record_name: record_name,
-      wild_pattern: wild_pattern,
-      attributes: attributes
+      loaded: loaded,
+      autogenerate_id: schema_meta[:autogenerate_id],
+      schema_erl_prefix: schema |> to_string() |> String.replace(".", "_")
     }
+    |> build_extra_key(keys)
+    |> build_attributes()
+    |> build_index()
+    |> build_default()
+    |> build_source_field()
   end
 
   @doc false
@@ -107,6 +89,64 @@ defmodule Ecto.Adapters.Mnesia.Source do
     else
       schema
     end
+  end
+
+  defp build_extra_key(source, []), do: source
+
+  defp build_extra_key(source, [_]), do: source
+
+  defp build_extra_key(source, keys) do
+    extra_key =
+      keys
+      |> Enum.with_index()
+      |> Enum.reduce(%{}, fn {key, i}, acc ->
+        Map.put(acc, key, i)
+      end)
+
+    %{source | extra_key: extra_key}
+  end
+
+  defp build_attributes(%{schema: schema, extra_key: nil} = source),
+    do: %{source | attributes: schema_sources(schema)}
+
+  defp build_attributes(%{schema: schema} = source),
+    do: %{source | attributes: [:__key__ | schema_sources(schema)]}
+
+  defp build_index(%{attributes: attributes} = source) do
+    index =
+      attributes
+      |> Enum.with_index()
+      |> Enum.reduce(%{}, fn
+        {:__key__, _}, acc -> acc
+        {a, i}, acc -> Map.put(acc, a, i + 1)
+      end)
+
+    %{source | index: index}
+  end
+
+  defp build_source_field(%{schema: schema} = source) do
+    map =
+      schema
+      |> apply(:__schema__, [:fields])
+      |> Enum.reduce(%{}, &Map.put(&2, schema.__schema__(:field_source, &1), &1))
+
+    %{source | source_field: map}
+  end
+
+  defp build_default(%{attributes: attributes, record_name: record_name} = source) do
+    default =
+      nil
+      |> Tuple.duplicate(length(attributes))
+      |> Tuple.insert_at(0, record_name)
+      |> maybe_default_extra_key(source)
+
+    %{source | default: default}
+  end
+
+  defp maybe_default_extra_key(record, %{extra_key: nil}), do: record
+
+  defp maybe_default_extra_key(record, %{extra_key: extra_key}) do
+    put_elem(record, 1, Tuple.duplicate(nil, Enum.count(extra_key)))
   end
 
   defp schema_sources(schema) do
