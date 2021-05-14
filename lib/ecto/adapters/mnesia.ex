@@ -615,8 +615,8 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   defp conflict?(params, source, %{repo: repo}) do
-    params
-    |> Record.uniques(source)
+    source
+    |> Source.uniques(params)
     |> case do
       [] ->
         nil

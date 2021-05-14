@@ -5,7 +5,6 @@ defmodule Ecto.Adapters.Mnesia.Record do
   alias Ecto.Adapters.Mnesia.Source
 
   @type t :: tuple()
-  @type context :: Source.t()
 
   # new api
   @spec new(tuple() | Keyword.t() | map() | Ecto.Schema.t(), Source.t()) :: t()
@@ -58,20 +57,7 @@ defmodule Ecto.Adapters.Mnesia.Record do
     end)
   end
 
-  @spec uniques(Keyword.t(), context()) :: [{atom(), term()}]
-  def uniques(params, context) do
-    keys = apply(context.schema, :__schema__, [:primary_key])
-
-    keys
-    |> Enum.reduce([], fn key, acc ->
-      case Keyword.fetch(params, key) do
-        {:ok, value} -> [{key, value} | acc]
-        :error -> acc
-      end
-    end)
-  end
-
-  @spec gen_id(Keyword.t(), context()) :: Keyword.t()
+  @spec gen_id(Keyword.t(), Source.t()) :: Keyword.t()
   def gen_id(params, source) do
     case source.autogenerate_id do
       nil ->

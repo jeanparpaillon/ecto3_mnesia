@@ -21,7 +21,18 @@ defmodule Ecto.Adapters.Mnesia.Source do
     schema = schema_meta.schema
 
     record_name = record_name(schema)
-    attributes = schema_sources(schema)
+
+    attributes =
+      case schema.__schema__(:primary_key) do
+        [] ->
+          schema_sources(schema)
+
+        [_] ->
+          schema_sources(schema)
+
+        [_, _ | _] ->
+          [:__key__ | schema_sources(schema)]
+      end
 
     wild_pattern = :_ |> Tuple.duplicate(length(attributes)) |> Tuple.insert_at(0, record_name)
 
@@ -55,6 +66,20 @@ defmodule Ecto.Adapters.Mnesia.Source do
   @doc false
   def fields(%{schema: schema}) do
     schema.__schema__(:fields)
+  end
+
+  @doc false
+  @spec uniques(t(), Keyword.t()) :: [{atom(), term()}]
+  def uniques(%{schema: schema}, params) do
+    keys = schema.__schema__(:primary_key)
+
+    keys
+    |> Enum.reduce([], fn key, acc ->
+      case Keyword.fetch(params, key) do
+        {:ok, value} -> [{key, value} | acc]
+        :error -> acc
+      end
+    end)
   end
 
   @doc false
