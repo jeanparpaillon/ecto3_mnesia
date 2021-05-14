@@ -81,18 +81,12 @@ defmodule Ecto.Adapters.Mnesia.Record do
         if params[id_source] do
           params
         else
-          record_name = record_name(source)
-          Keyword.put(params, id_source, Mnesia.autogenerate({{record_name, id_source}, type}))
+          Keyword.put(
+            params,
+            id_source,
+            Mnesia.autogenerate({{source.record_name, id_source}, type})
+          )
         end
-    end
-  end
-
-  @spec record_name(Source.t()) :: atom()
-  def record_name(%{schema: schema}) do
-    if function_exported?(schema, :__record_name__, 0) do
-      apply(schema, :__record_name__, [])
-    else
-      schema
     end
   end
 end
