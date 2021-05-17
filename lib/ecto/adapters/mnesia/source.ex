@@ -102,6 +102,7 @@ defmodule Ecto.Adapters.Mnesia.Source do
   defp build_extra_key(source, keys) do
     extra_key =
       keys
+      |> Enum.map(&source.schema.__schema__(:field_source, &1))
       |> Enum.with_index()
       |> Enum.reduce(%{}, fn {key, i}, acc ->
         Map.put(acc, key, i)

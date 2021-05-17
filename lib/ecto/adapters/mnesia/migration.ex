@@ -65,9 +65,7 @@ defmodule Ecto.Adapters.Mnesia.Migration do
       |> Keyword.get(:index, [])
       |> MapSet.new()
       |> MapSet.union(MapSet.new(extra_keys))
-      |> Enum.reduce([], fn field, acc ->
-        [source.schema.__schema__(:field_source, field) | acc]
-      end)
+      |> MapSet.to_list()
 
     [
       index: index,
