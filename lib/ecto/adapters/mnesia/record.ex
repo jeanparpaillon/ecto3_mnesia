@@ -31,11 +31,16 @@ defmodule Ecto.Adapters.Mnesia.Record do
     params
     |> Enum.reduce(record, fn {field, value}, acc ->
       if replace == :all or Enum.member?(replace, field) do
-        field_index = source.index[field]
+        case source.index[field] do
+          nil ->
+            # Association or vitual field
+            acc
 
-        acc
-        |> put_elem(field_index, value)
-        |> maybe_update_key(field, field_index, source)
+          field_index ->
+            acc
+            |> put_elem(field_index, value)
+            |> maybe_update_key(field, field_index, source)
+        end
       else
         acc
       end
