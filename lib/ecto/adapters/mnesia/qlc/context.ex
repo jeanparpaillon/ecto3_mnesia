@@ -3,12 +3,17 @@ defmodule Ecto.Adapters.Mnesia.Qlc.Context do
 
   alias Ecto.Adapters.Mnesia.Source
 
-  defstruct sources: [], params: [], qualifiers: [], joins: [], bindings: [], index: 0
+  defstruct sources: [], sources_index: %{}, params: [], qualifiers: [], joins: [], bindings: [], index: 0
 
   @type t :: %__MODULE__{}
 
   def new(sources) do
-    %__MODULE__{sources: sources}
+    sources_index =
+      sources
+      |> Enum.with_index()
+      |> Map.new(fn {s, i} -> {i, s} end)
+
+    %__MODULE__{sources: sources, sources_index: sources_index}
   end
 
   def add_binding(context, {field, source}, value) do

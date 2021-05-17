@@ -37,13 +37,8 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
       Enum.reduce(order_bys, query, fn
         %QueryExpr{expr: expr}, query1 ->
           Enum.reduce(expr, query1, fn {order, field_expr}, query2 ->
-            field =
-              context.sources
-              |> Enum.with_index()
-              |> Enum.find_value(&field(field_expr, &1))
-
+            field = field(field_expr, context)
             field_index = Enum.find_index(fields(select, context), fn e -> e == field end)
-
             Qlc.keysort(query2, field_index, order: @order_mapping[order])
           end)
       end)
@@ -112,12 +107,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   end
 
   defp fields(%SelectExpr{fields: fields}, context) do
-    context.sources
-    |> Enum.with_index()
-    |> Enum.flat_map(fn {source, i} ->
-      Enum.map(fields, &field(&1, {source, i}))
-      |> Enum.reject(&is_nil(&1))
-    end)
+    Enum.map(fields, &field(&1, context))
   end
 
   defp fields(:all, %{sources: [source | _t]}) do
@@ -128,8 +118,8 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     Source.qlc_attributes_pattern(source)
   end
 
-  defp field({{_, _, [{:&, [], [source_index]}, field]}, [], []}, {source, source_index}) do
-    Source.to_erl_var(source, field)
+  defp field({{_, _, [{:&, [], [source_index]}, field]}, [], []}, context) do
+    Source.to_erl_var(context.sources_index[source_index], field)
   end
 
   defp field(_, _), do: nil
