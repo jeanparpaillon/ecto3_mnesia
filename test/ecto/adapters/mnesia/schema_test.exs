@@ -357,20 +357,20 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
-    # test "Repo#insert valid record - multiple primary keys" do
-    #   assert {:ok, _} =
-    #            TestRepo.insert(%MultiplePrimaryKeyTestSchema{key1: 1, key2: 1, field: "field 1"})
+    test "Repo#insert valid record - multiple primary keys" do
+      assert {:ok, _} =
+               TestRepo.insert(%MultiplePrimaryKeyTestSchema{key1: 1, key2: 1, field: "field 1"})
 
-    #   assert {:ok, _} =
-    #            TestRepo.insert(%MultiplePrimaryKeyTestSchema{key1: 1, key2: 2, field: "field 2"})
+      assert {:ok, _} =
+               TestRepo.insert(%MultiplePrimaryKeyTestSchema{key1: 1, key2: 2, field: "field 2"})
 
-    #   for i <- [1, 2] do
-    #     ret = :mnesia.dirty_read(@multiple_primary_key_table_name, {1, i})
-    #     assert [{MultiplePrimaryKeyTestSchema, {1, ^i}, 1, ^i, _, _, _}] = ret
-    #   end
+      for i <- [1, 2] do
+        ret = :mnesia.dirty_read(@multiple_primary_key_table_name, {1, i})
+        assert [{MultiplePrimaryKeyTestSchema, {1, ^i}, 1, ^i, _, _, _}] = ret
+      end
 
-    #   :mnesia.clear_table(@alt_record_table_name)
-    # end
+      :mnesia.clear_table(@multiple_primary_key_table_name)
+    end
   end
 
   describe "Ecto.Adapters.Schema#insert_all" do
