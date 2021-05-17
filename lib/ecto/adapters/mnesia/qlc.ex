@@ -247,20 +247,19 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   end
 
   defp to_qlc(
-         {:!=, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, value]},
-         context
-       ) do
-    source = Enum.at(context.sources, source_index)
-    {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, value)
-    {"#{erl_var} =/= #{bind_var}", context}
-  end
-
-  defp to_qlc(
          {op, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, value]},
          context
        ) do
     source = Enum.at(context.sources, source_index)
     {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, value)
-    {"#{erl_var} #{op} #{bind_var}", context}
+    {"#{erl_var} #{to_qlc_binary_op(op)} #{bind_var}", context}
   end
+
+  defp to_qlc_binary_op(:==), do: "=="
+  defp to_qlc_binary_op(:!=), do: "=/="
+  defp to_qlc_binary_op(:<=), do: "=<"
+  defp to_qlc_binary_op(:>=), do: ">="
+  defp to_qlc_binary_op(:<), do: "<"
+  defp to_qlc_binary_op(:>), do: ">"
+  defp to_qlc_binary_op(op), do: op
 end
