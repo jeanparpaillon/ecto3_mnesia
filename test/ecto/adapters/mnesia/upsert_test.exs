@@ -14,11 +14,11 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
     use Ecto.Schema
 
     schema "#{Ecto.Adapters.Mnesia.UpsertTest.Table}" do
-      timestamps()
-
       field(:field1, :string)
       field(:field2, :string)
       field(:field3, :string)
+
+      timestamps()
     end
 
     def changeset(%TestSchema{} = struct, params) do
@@ -26,18 +26,7 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
       |> Ecto.Changeset.cast(params, [:field1, :field2, :field3])
     end
 
-    defimpl Ecto.Adapters.Mnesia.Recordable do
-      def record_name(_), do: :rec
-
-      def load(struct, record, context),
-        do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).load(struct, record, context)
-
-      def dump(struct, params, context),
-        do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).dump(struct, params, context)
-
-      def key(struct, params, context),
-        do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).key(struct, params, context)
-    end
+    def __record_name__, do: :rec
   end
 
   setup_all do

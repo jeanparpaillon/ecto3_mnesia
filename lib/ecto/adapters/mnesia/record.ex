@@ -1,97 +1,76 @@
 defmodule Ecto.Adapters.Mnesia.Record do
   @moduledoc false
+  alias Ecto.Adapter.Schema
   alias Ecto.Adapters.Mnesia
-  alias Ecto.Adapters.Mnesia.Recordable
+  alias Ecto.Adapters.Mnesia.Source
 
   @type t :: tuple()
-  @type context :: %{
-          :table_name => atom(),
-          :schema_meta => %{
-            optional(:autogenerate_id) =>
-              {schema_field :: atom(), source_field :: atom(), Ecto.Type.t()},
-            optional(:context) => term(),
-            optional(:prefix) => binary() | nil,
-            :schema => atom(),
-            optional(:source) => binary()
-          },
-          optional(:adapter_meta) => Ecto.Adapter.Schema.adapter_meta()
-        }
 
-  @spec to_schema(record :: t(), context()) :: struct()
-  def to_schema(record, context) do
-    loaded = loaded(context)
-
-    loaded
-    |> Map.merge(Enum.into(Recordable.load(loaded, record, context), %{}))
+  # new api
+  @spec new(tuple() | Keyword.t() | map() | Ecto.Schema.t(), Source.t()) :: t()
+  def new(data, source) when is_tuple(data) do
+    Tuple.insert_at(data, 0, source.record_name)
   end
 
-  @spec to_record(params :: Keyword.t() | [tuple()], context()) :: record :: t()
-  def to_record(params, context) do
-    struct = loaded(context)
-    record_name = Recordable.record_name(struct)
-
+  def new(%{__struct__: _} = struct, source) do
     struct
-    |> Recordable.dump(params, context)
-    |> List.insert_at(0, record_name)
-    |> List.to_tuple()
+    |> Map.from_struct()
+    |> Map.drop([:__meta__])
+    |> Enum.map(fn {field, value} -> {source.schema.__schema__(:field_source, field), value} end)
+    |> new(source)
   end
 
-  @spec to_keyword(t(), context()) :: Keyword.t()
-  def to_keyword(record, context) do
-    context |> loaded() |> Recordable.load(record, context)
+  def new(data, source) when is_list(data) or is_map(data) do
+    pattern = source.default
+    update(pattern, data, source)
   end
 
-  @spec uniques(Keyword.t(), context()) :: [{atom(), term()}]
-  def uniques(params, context) do
-    keys = apply(context.schema_meta.schema, :__schema__, [:primary_key])
-
-    keys
-    |> Enum.reduce([], fn key, acc ->
-      case Keyword.fetch(params, key) do
-        {:ok, value} -> [{key, value} | acc]
-        :error -> acc
-      end
-    end)
-  end
-
-  @spec update(orig :: Keyword.t(), new :: Keyword.t(), replace :: list() | :all, context()) ::
-          Keyword.t()
-  def update(orig, new, replace \\ :all, _context) do
-    orig
-    |> Enum.reduce([], fn {field, old}, acc ->
+  # new api
+  @spec update(t(), Enumerable.t(), Source.t(), [atom()] | :all) :: t()
+  def update(record, params, source, replace \\ :all) do
+    params
+    |> Enum.reduce(record, fn {field, value}, acc ->
       if replace == :all or Enum.member?(replace, field) do
-        case Keyword.fetch(new, field) do
-          {:ok, value} -> Keyword.put(acc, field, value)
-          :error -> Keyword.put(acc, field, old)
-        end
+        field_index = source.index[field]
+
+        acc
+        |> put_elem(field_index, value)
+        |> maybe_update_key(field, field_index, source)
       else
-        Keyword.put(acc, field, old)
+        acc
       end
     end)
   end
 
-  @spec select(record :: t(), attributes :: [atom()], context()) :: [term()]
-  def select(record, fields, context) do
-    loaded = loaded(context)
-    fields = MapSet.new(fields)
-
-    loaded
-    |> Recordable.load(record, context)
-    |> Enum.filter(&Enum.member?(fields, elem(&1, 0)))
+  # new api
+  @spec select(t(), [atom()], Source.t()) :: Schema.fields()
+  def select(record, fields, %{index: index}) do
+    Enum.map(fields, &{&1, elem(record, index[&1])})
   end
 
-  @spec gen_id(Keyword.t(), context()) :: Keyword.t()
-  def gen_id(params, context) do
-    case get_in(context, [:schema_meta, :autogenerate_id]) do
+  @spec to_schema(t(), Source.t()) :: Ecto.Schema.t()
+  def to_schema(record, %{loaded: loaded, index: index, source_field: fields}) do
+    index
+    |> Enum.reduce(loaded, fn {field, i}, acc ->
+      Map.put(acc, fields[field], elem(record, i))
+    end)
+  end
+
+  @spec gen_id(Keyword.t(), Source.t()) :: Keyword.t()
+  def gen_id(params, source) do
+    case source.autogenerate_id do
       nil ->
         params
 
-      {_key, source, type} ->
-        if params[source] do
+      {_key, id_source, type} ->
+        if params[id_source] do
           params
         else
-          record_name = context |> loaded() |> Recordable.record_name()
-          Keyword.put(params, source, Mnesia.autogenerate({{record_name, source}, type}))
+          Keyword.put(
+            params,
+            id_source,
+            Mnesia.autogenerate({{source.record_name, id_source}, type})
+          )
         end
     end
   end
@@ -99,19 +78,21 @@ defmodule Ecto.Adapters.Mnesia.Record do
   ###
   ### Priv
   ###
-  defp loaded(context) do
-    apply(get_in(context, [:schema_meta, :schema]), :__schema__, [:loaded])
-  end
+  defp maybe_update_key(record, _field, _field_index, %{extra_key: nil}),
+    do: record
 
-  defmodule Attributes do
-    @moduledoc false
+  defp maybe_update_key(record, field, field_index, %{extra_key: extra_key}) do
+    case Map.fetch(extra_key, field) do
+      {:ok, key_index} ->
+        key =
+          record
+          |> elem(1)
+          |> put_elem(key_index, elem(record, field_index))
 
-    @type t :: list()
+        put_elem(record, 1, key)
 
-    @spec to_erl_var(attribute :: atom(), source :: tuple()) :: erl_var :: String.t()
-    def to_erl_var(attribute, {_table_name, schema}) do
-      (schema |> to_string() |> String.split(".") |> List.last()) <>
-        (attribute |> Atom.to_string() |> String.capitalize())
+      :error ->
+        record
     end
   end
 end

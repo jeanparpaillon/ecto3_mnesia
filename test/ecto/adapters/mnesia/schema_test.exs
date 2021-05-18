@@ -12,14 +12,15 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
   @array_table_name __MODULE__.ArrayTable
   @binary_id_table_name __MODULE__.BinaryIdTable
   @without_primary_key_table_name __MODULE__.WithoutPrimaryKeyTable
+  @multiple_primary_key_table_name __MODULE__.MultiplePrimaryKeyTable
 
   defmodule TestSchema do
     use Ecto.Schema
 
     schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.Table}" do
-      timestamps()
-
       field(:field, :string)
+
+      timestamps()
     end
 
     def changeset(%TestSchema{} = struct, params) do
@@ -40,27 +41,16 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       |> Ecto.Changeset.cast(params, [:field])
     end
 
-    defimpl Ecto.Adapters.Mnesia.Recordable do
-      def record_name(_s), do: :alt_record
-
-      def load(struct, record, context),
-        do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).load(struct, record, context)
-
-      def dump(struct, params, context),
-        do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).dump(struct, params, context)
-
-      def key(struct, params, context),
-        do: Ecto.Adapters.Mnesia.Recordable.impl_for(nil).key(struct, params, context)
-    end
+    def __record_name__, do: :alt_record
   end
 
   defmodule ArrayTestSchema do
     use Ecto.Schema
 
     schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.ArrayTable}" do
-      timestamps()
-
       field(:field, {:array, :string})
+
+      timestamps()
     end
 
     def changeset(%ArrayTestSchema{} = struct, params) do
@@ -74,9 +64,9 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
     @primary_key {:id, :binary_id, autogenerate: true}
     schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.BinaryIdTable}" do
-      timestamps()
-
       field(:field, :string)
+
+      timestamps()
     end
 
     def changeset(%TestSchema{} = struct, params) do
@@ -90,14 +80,32 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
     @primary_key false
     schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.WithoutPrimaryKeyTable}" do
-      timestamps()
-
       field(:field, :string)
+
+      timestamps()
     end
 
     def changeset(%TestSchema{} = struct, params) do
       struct
       |> Ecto.Changeset.cast(params, [:field])
+    end
+  end
+
+  defmodule MultiplePrimaryKeyTestSchema do
+    use Ecto.Schema
+
+    @primary_key false
+    schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.MultiplePrimaryKeyTable}" do
+      field(:key1, :id, primary_key: true)
+      field(:key2, :id, primary_key: true)
+      field(:field, :string)
+
+      timestamps()
+    end
+
+    def changeset(%TestSchema{} = struct, params) do
+      struct
+      |> Ecto.Changeset.cast(params, [:key1, :key2, :field])
     end
   end
 
@@ -146,7 +154,18 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       type: :ordered_set
     )
 
-    :mnesia.wait_for_tables([@table_name, @binary_id_table_name], 1000)
+    :mnesia.create_table(@multiple_primary_key_table_name,
+      ram_copies: [node()],
+      record_name: MultiplePrimaryKeyTestSchema,
+      attributes: [:__key__, :key1, :key2, :field, :inserted_at, :updated_at],
+      storage_properties: [ets: [:compressed]],
+      index: [:key1, :key2]
+    )
+
+    :mnesia.wait_for_tables(
+      [@table_name, @binary_id_table_name, @multiple_primary_key_table_name],
+      1000
+    )
   end
 
   describe "Ecto.Adapters.Schema#insert" do
@@ -337,6 +356,21 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
       :mnesia.clear_table(@table_name)
     end
+
+    test "Repo#insert valid record - multiple primary keys" do
+      assert {:ok, _} =
+               TestRepo.insert(%MultiplePrimaryKeyTestSchema{key1: 1, key2: 1, field: "field 1"})
+
+      assert {:ok, _} =
+               TestRepo.insert(%MultiplePrimaryKeyTestSchema{key1: 1, key2: 2, field: "field 2"})
+
+      for i <- [1, 2] do
+        ret = :mnesia.dirty_read(@multiple_primary_key_table_name, {1, i})
+        assert [{MultiplePrimaryKeyTestSchema, {1, ^i}, 1, ^i, _, _, _}] = ret
+      end
+
+      :mnesia.clear_table(@multiple_primary_key_table_name)
+    end
   end
 
   describe "Ecto.Adapters.Schema#insert_all" do
@@ -492,18 +526,11 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       id = record.id
       changeset = TestSchema.changeset(record, %{field: "field updated"})
 
-      case TestRepo.update(changeset) do
-        {:ok, %TestSchema{id: ^id, field: "field updated"}} ->
-          case :mnesia.transaction(fn ->
-                 :mnesia.read(@table_name, id)
-               end) do
-            {:atomic, [{TestSchema, ^id, "field updated", _, _}]} -> assert true
-            e -> assert false == e
-          end
+      ret = TestRepo.update(changeset)
+      assert {:ok, %TestSchema{id: ^id, field: "field updated"}} = ret
 
-        _ ->
-          assert false
-      end
+      ret = :mnesia.transaction(fn -> :mnesia.read(@table_name, id) end)
+      assert {:atomic, [{TestSchema, ^id, "field updated", _, _}]} = ret
 
       :mnesia.clear_table(@table_name)
     end

@@ -27,9 +27,9 @@ Mnesia is Distributed Database Management System shipped with Erlang runtime. Be
 - [x] Auto incremented ids
 - [x] Binary ids
 - [ ] Delete without primary key
-- [ ] Unique constraint
-
-Note: supports only on_conflict: :raise/:update_all
+- [x] Unique constraint (primary keys)
+- [ ] Unique constraint (arbitrary fields)
+- [x] on_conflict (raise, nothing, replace)
 
 3. Associations
 - [x] has_one associations
@@ -91,7 +91,7 @@ end
 mnesia tables can have record name different from table name. By default, the
 adapter use schema name (module name) as record name. For compatibility with
 existing applications, one can customize record name per schema, by implementing
-the `Ecto.Adapters.Mnesia.Recordable` protocol.
+`__record_name__/0` function in the schema module.
 
 ```
 defmodule MyApp.Schema do
@@ -104,9 +104,7 @@ defmodule MyApp.Schema do
 
   ...
 
-  defimpl Ecto.Adapters.Mnesia.Recordable do
-    def record_name(_s), do: :schema
-  end  
+  def __record_name__, do: :schema
 end
 ```
 

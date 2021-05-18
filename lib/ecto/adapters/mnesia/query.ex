@@ -1,11 +1,8 @@
 defmodule Ecto.Adapters.Mnesia.Query do
   @moduledoc false
-  import Ecto.Adapters.Mnesia.Table,
-    only: [
-      record_field_index: 2
-    ]
-
   alias Ecto.Adapters.Mnesia
+  alias Ecto.Adapters.Mnesia.Record
+  alias Ecto.Adapters.Mnesia.Source
   alias Ecto.Query.QueryExpr
   require Qlc
 
@@ -20,7 +17,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
   @type t :: %__MODULE__{
           original: Ecto.Query.t(),
           type: :all | :update_all | :delete_all,
-          sources: Keyword.t(),
+          sources: [Source.t()],
           query: (params :: list() -> query_handle :: :qlc.query_handle()),
           sort: (query_handle :: :qlc.query_handle() -> query_handle :: :qlc.query_handle()),
           answers: (query_handle :: :qlc.query_handle(), context :: Keyword.t() -> list(tuple())),
@@ -62,23 +59,22 @@ defmodule Ecto.Adapters.Mnesia.Query do
   defp sources(sources) do
     sources
     |> Tuple.to_list()
-    |> Enum.map(fn {table_name, schema, _} ->
-      {String.to_atom(table_name), schema}
-    end)
+    |> Enum.map(&Source.new/1)
   end
 
-  defp new_record({table_name, schema}, updates) do
-    fn record, params ->
+  defp new_record(source, updates) do
+    fn tuple, params ->
+      record = Record.new(tuple, source)
+
+      params =
+        params |> Enum.with_index() |> Enum.reduce(%{}, fn {p, i}, acc -> Map.put(acc, i, p) end)
+
       case updates do
         [%QueryExpr{expr: [set: replacements]}] ->
           replacements
-          |> Enum.reduce(record, fn {field, {:^, [], [param_index]}}, record ->
-            record_field_index = record_field_index(field, table_name)
-            value = Enum.at(params, param_index)
-            List.replace_at(record, record_field_index, value)
+          |> Enum.reduce(record, fn {field, {:^, [], [param_index]}}, acc ->
+            Record.update(acc, [{field, Map.get(params, param_index)}], source)
           end)
-          |> List.insert_at(0, schema)
-          |> List.to_tuple()
 
         _ ->
           record
