@@ -320,14 +320,6 @@ defmodule Ecto.Adapters.Mnesia do
 
   def autogenerate({_source, :binary_id}), do: Ecto.UUID.generate()
 
-  @doc """
-  Returns sequence tuple for given schema
-  """
-  def seq_id(schema, seq) do
-    key = schema |> apply(:__schema__, [:source]) |> String.to_atom()
-    {Connection.id_seq_table_name(), key, seq}
-  end
-
   @impl Ecto.Adapter.Schema
   def insert(adapter_meta, schema_meta, params, on_conflict, returning, _opts) do
     source = Source.new(schema_meta)
