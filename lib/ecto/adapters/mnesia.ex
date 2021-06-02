@@ -133,6 +133,9 @@ defmodule Ecto.Adapters.Mnesia do
   @impl Ecto.Adapter
   def loaders(_primitive, type), do: [type]
 
+  @impl Ecto.Adapter
+  def checked_out?(_adapter_meta), do: true
+
   @impl Ecto.Adapter.Queryable
   def prepare(type, query) do
     {:nocache, Connection.all(type, query)}
