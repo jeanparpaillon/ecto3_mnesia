@@ -67,14 +67,14 @@ defmodule Ecto.Adapters.Mnesia.Record do
       nil ->
         params
 
-      {_key, id_source, type} ->
-        if params[id_source] do
+      {_schema_key, source_key, type} ->
+        if params[source_key] do
           params
         else
           Keyword.put(
             params,
-            id_source,
-            Mnesia.autogenerate({{source.record_name, id_source}, type})
+            source_key,
+            Mnesia.autogenerate({{source.table, source_key}, type})
           )
         end
     end
