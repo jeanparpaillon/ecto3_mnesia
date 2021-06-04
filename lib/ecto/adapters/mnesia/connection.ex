@@ -24,14 +24,12 @@ defmodule Ecto.Adapters.Mnesia.Connection do
 
   @impl GenServer
   def terminate(_reason, state) do
-    spawn(fn ->
-      try do
-        :dets.sync(@id_seq_table_name)
-        state
-      rescue
-        e -> e
-      end
-    end)
+    try do
+      :dets.sync(@id_seq_table_name)
+      state
+    rescue
+      e -> e
+    end
   end
 
   def id_seq_table_name, do: @id_seq_table_name
