@@ -48,7 +48,7 @@ defmodule Ecto.Adapters.Mnesia.Connection do
 
   defp ensure_id_seq_table(nodes) when is_list(nodes) do
     case :mnesia.create_table(@id_seq_table_name,
-           disc_only_copies: nodes,
+           disc_copies: nodes,
            attributes: [:id, :_dummy],
            type: :set
          ) do
