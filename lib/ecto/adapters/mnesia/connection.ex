@@ -50,7 +50,8 @@ defmodule Ecto.Adapters.Mnesia.Connection do
     case :mnesia.create_table(@id_seq_table_name,
            disc_copies: nodes,
            attributes: [:id, :_dummy],
-           type: :set
+           type: :set,
+           storage_properties: [dets: [auto_save: 5_000]]
          ) do
       {:atomic, :ok} ->
         :mnesia.wait_for_tables([@id_seq_table_name], 1_000)
