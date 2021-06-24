@@ -114,6 +114,9 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   @impl Ecto.Adapter
+  def checked_out?(_adapter_meta), do: true
+
+  @impl Ecto.Adapter
   def dumpers(_, type), do: [type]
 
   @impl Ecto.Adapter
@@ -349,16 +352,21 @@ defmodule Ecto.Adapters.Mnesia do
     end
   end
 
-  @impl Ecto.Adapter.Schema
   if Version.compare(@ecto_vsn, "3.6.0") in [:eq, :gt] do
+    @impl Ecto.Adapter.Schema
     def insert_all(adapter_meta, schema, header, records, on_conflict, returning, [], opts),
-      do: insert_all(adapter_meta, schema, header, records, on_conflict, returning, opts)
+      do: do_insert_all(adapter_meta, schema, header, records, on_conflict, returning, opts)
 
+    @impl Ecto.Adapter.Schema
     def insert_all(_, _, _, _, _, _, _placeholders, _),
       do: raise(ArgumentError, ":placeholders is not supported by mnesia")
+  else
+    @impl Ecto.Adapter.Schema
+    def insert_all(adapter_meta, schema, header, records, on_conflict, returning, opts),
+      do: do_insert_all(adapter_meta, schema, header, records, on_conflict, returning, opts)
   end
 
-  def insert_all(adapter_meta, schema_meta, _header, records, on_conflict, returning, _opts) do
+  defp do_insert_all(adapter_meta, schema_meta, _header, records, on_conflict, returning, _opts) do
     source = Source.new(schema_meta)
 
     case :timer.tc(&mnesia_transaction_wrapper/2, [
