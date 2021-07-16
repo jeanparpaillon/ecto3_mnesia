@@ -2,6 +2,7 @@ defmodule Ecto.Adapters.Mnesia.Constraint.ForeignKeyTest do
   use ExUnit.Case, async: false
 
   alias Ecto.Adapters.Mnesia.Constraint.ForeignKey
+  alias Ecto.Adapters.Mnesia.Source
 
   defmodule BaseSchema do
     use Ecto.Schema
@@ -23,25 +24,23 @@ defmodule Ecto.Adapters.Mnesia.Constraint.ForeignKeyTest do
   end
 
   test ".references/2 - defaults" do
-    ret = ForeignKey.new({:ref, :parent_id}, :base)
+    ret = ForeignKey.new(Source.new(%{schema: RefSchema}), :parent)
 
     assert %ForeignKey{
              name: "ref_parent_id_fkey",
-             from: {:ref, [:parent_id]},
-             to: {:base, [:id]},
-             type: :id,
+             from: %Source{table: :ref},
+             to: %Source{table: :base},
              errors: []
            } = ret
   end
 
   test ".references/2 - name opt" do
-    ret = ForeignKey.new({:ref, :parent_id}, :base, name: "custom_fkey")
+    ret = ForeignKey.new(Source.new(%{schema: RefSchema}), :parent, name: "custom_fkey")
 
     assert %ForeignKey{
              name: "custom_fkey",
-             from: {:ref, [:parent_id]},
-             to: {:base, [:id]},
-             type: :id,
+             from: %Source{table: :ref},
+             to: %Source{table: :base},
              errors: []
            } = ret
   end

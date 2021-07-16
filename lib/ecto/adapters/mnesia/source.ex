@@ -4,6 +4,7 @@ defmodule Ecto.Adapters.Mnesia.Source do
             schema: nil,
             loaded: nil,
             default: nil,
+            match_all: nil,
             autogenerate_id: nil,
             index: %{},
             source_field: %{},
@@ -37,6 +38,7 @@ defmodule Ecto.Adapters.Mnesia.Source do
     |> build_attributes()
     |> build_index()
     |> build_default()
+    |> build_match_all()
     |> build_source_field()
   end
 
@@ -146,6 +148,15 @@ defmodule Ecto.Adapters.Mnesia.Source do
       |> maybe_default_extra_key(source)
 
     %{source | default: default}
+  end
+
+  defp build_match_all(%{attributes: attributes, record_name: record_name} = source) do
+    pattern =
+      :_
+      |> Tuple.duplicate(length(attributes))
+      |> Tuple.insert_at(0, record_name)
+
+    %{source | match_all: pattern}
   end
 
   defp maybe_default_extra_key(record, %{extra_key: nil}), do: record
