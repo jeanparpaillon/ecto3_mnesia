@@ -3,7 +3,13 @@ defmodule Ecto.Adapters.Mnesia.Qlc.Context do
 
   alias Ecto.Adapters.Mnesia.Source
 
-  defstruct sources: [], sources_index: %{}, params: [], qualifiers: [], joins: [], bindings: [], index: 0
+  defstruct sources: [],
+            sources_index: %{},
+            params: [],
+            qualifiers: [],
+            joins: [],
+            bindings: [],
+            index: 0
 
   @type t :: %__MODULE__{}
 
