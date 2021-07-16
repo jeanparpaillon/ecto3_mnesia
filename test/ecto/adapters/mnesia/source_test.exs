@@ -76,7 +76,7 @@ defmodule Ecto.Adapters.Mnesia.SourceTest do
                  :updated_at
                ],
                default: {KeysSourceSchema, {nil, nil}, nil, nil, nil, nil, nil},
-               extra_key: %{key1: 0, key2: 1}
+               extra_key: %{source_key1: 0, key2: 1}
              } = ret
     end
   end
