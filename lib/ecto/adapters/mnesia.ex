@@ -465,16 +465,28 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Storage
   def storage_up(options) do
-    :mnesia.stop()
+    nodes = options[:nodes] || [node()]
 
-    case :mnesia.create_schema(options[:nodes] || [node()]) do
-      :ok ->
-        :mnesia.start()
+    ret =
+      if storage_status(options) == :down do
+        :mnesia.stop()
 
-      {:error, {_, {:already_exists, _}}} ->
-        with :ok <- :mnesia.start() do
-          {:error, :already_up}
-        end
+        ret =
+          case :mnesia.create_schema(nodes) do
+            :ok -> :ok
+            {:error, :already_exists} -> {:error, :already_up}
+          end
+
+        :ok = :mnesia.start()
+
+        ret
+      else
+        {:error, :already_up}
+      end
+
+    with :ok <- :mnesia.start(),
+         id_seq when id_seq in [:ok, :already_exists] <- Connection.ensure_id_seq_table(nodes) do
+      ret
     end
   end
 
