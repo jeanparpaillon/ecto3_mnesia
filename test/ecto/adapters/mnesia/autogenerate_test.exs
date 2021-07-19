@@ -37,7 +37,6 @@ defmodule Ecto.Adapters.Mnesia.AutogenerateTest do
     {:ok, %TestSchema{id: id}} = Repo.insert(%TestSchema{field: "value"})
 
     assert is_integer(id)
-
-    assert id == Mnesia.autogenerate({{@table_name, :pkey}, :id}) - 1
+    assert id == Mnesia.next_id(@table_name, :pkey) - 1
   end
 end
