@@ -24,14 +24,12 @@ defmodule Ecto.Adapters.Mnesia.Connection do
 
   @impl GenServer
   def terminate(_reason, state) do
-    spawn(fn ->
-      try do
-        :dets.sync(@id_seq_table_name)
-        state
-      rescue
-        e -> e
-      end
-    end)
+    try do
+      :dets.sync(@id_seq_table_name)
+      state
+    rescue
+      e -> e
+    end
   end
 
   def id_seq_table_name, do: @id_seq_table_name
@@ -48,9 +46,10 @@ defmodule Ecto.Adapters.Mnesia.Connection do
 
   defp ensure_id_seq_table(nodes) when is_list(nodes) do
     case :mnesia.create_table(@id_seq_table_name,
-           disc_only_copies: nodes,
+           disc_copies: nodes,
            attributes: [:id, :_dummy],
-           type: :set
+           type: :set,
+           storage_properties: [dets: [auto_save: 5_000]]
          ) do
       {:atomic, :ok} ->
         :mnesia.wait_for_tables([@id_seq_table_name], 1_000)

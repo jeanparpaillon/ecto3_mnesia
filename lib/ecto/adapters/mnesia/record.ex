@@ -67,15 +67,11 @@ defmodule Ecto.Adapters.Mnesia.Record do
       nil ->
         params
 
-      {_key, id_source, type} ->
-        if params[id_source] do
+      {_schema_key, source_key, type} ->
+        if params[source_key] do
           params
         else
-          Keyword.put(
-            params,
-            id_source,
-            Mnesia.autogenerate({{source.record_name, id_source}, type})
-          )
+          merge_autogen_params(params, source.table, source_key, type)
         end
     end
   end
@@ -99,5 +95,13 @@ defmodule Ecto.Adapters.Mnesia.Record do
       :error ->
         record
     end
+  end
+
+  defp merge_autogen_params(params, table, key, :id) do
+    Keyword.put(params, key, Mnesia.next_id(table, key))
+  end
+
+  defp merge_autogen_params(params, _table, key, :binary_id) do
+    Keyword.put(params, key, Ecto.UUID.generate())
   end
 end
