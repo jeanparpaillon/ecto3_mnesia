@@ -1,5 +1,5 @@
 defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
-  use ExUnit.Case, async: false
+  use Ecto.Adapters.Mnesia.RepoCase, async: false
 
   import Ecto.Query, only: [from: 2]
 
@@ -27,6 +27,8 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
     schema "#{Ecto.Adapters.MnesiaQueryableIntegrationTest.Table}" do
       field(:field, :string)
     end
+
+    def __record_name__, do: TestSchema
   end
 
   defmodule TestSchema2 do
@@ -35,34 +37,15 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
     schema "#{Ecto.Adapters.MnesiaQueryableIntegrationTest.Table2}" do
       field(:field, TestType.Charlist)
     end
+
+    def __record_name__, do: TestSchema2
   end
 
   setup_all do
-    ExUnit.CaptureLog.capture_log(fn -> Mnesia.storage_up(nodes: [node()]) end)
-    Mnesia.ensure_all_started([], :permanent)
-    {:ok, _repo} = TestRepo.start_link()
-
-    :mnesia.create_table(@table_name,
-      ram_copies: [node()],
-      record_name: TestSchema,
-      attributes: [:id, :field],
-      storage_properties: [
-        ets: [:compressed]
-      ],
-      type: :ordered_set
-    )
-
-    :mnesia.create_table(@table_name2,
-      ram_copies: [node()],
-      record_name: TestSchema2,
-      attributes: [:id, :field],
-      storage_properties: [
-        ets: [:compressed]
-      ],
-      type: :ordered_set
-    )
-
-    :mnesia.wait_for_tables([@table_name, @table_name2], 1000)
+    [TestSchema, TestSchema2]
+    |> Enum.each(fn schema ->
+      :ok = Mnesia.Migration.sync_create_table(schema, ram_copies: [node()], type: :ordered_set)
+    end)
   end
 
   describe "Ecto.Adapter.Queryable#execute" do

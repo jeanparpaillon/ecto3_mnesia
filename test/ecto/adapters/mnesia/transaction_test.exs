@@ -1,12 +1,10 @@
 defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
-  use ExUnit.Case, async: false
+  use Ecto.Adapters.Mnesia.RepoCase, async: false
 
   alias EctoMnesia.TestRepo
   alias Ecto.Adapters.Mnesia
   alias Ecto.Changeset
   alias Ecto.Multi
-
-  @table_name __MODULE__.Table
 
   defmodule TestSchema do
     use Ecto.Schema
@@ -23,30 +21,13 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
   end
 
   setup_all do
-    ExUnit.CaptureLog.capture_log(fn -> Mnesia.storage_up(nodes: [node()]) end)
-    Mnesia.ensure_all_started([], :permanent)
-    {:ok, _repo} = TestRepo.start_link()
+    :ok = Mnesia.Migration.drop_table(TestSchema)
+    :ok = Mnesia.Migration.sync_create_table(TestSchema, ram_copies: [node()], type: :ordered_set)
 
-    :mnesia.create_table(@table_name,
-      ram_copies: [node()],
-      record_name: TestSchema,
-      attributes: [:id, :field],
-      storage_properties: [
-        ets: [:compressed]
-      ],
-      type: :ordered_set
-    )
-
-    :mnesia.wait_for_tables([@table_name], 1000)
+    :ok
   end
 
   describe "Ecto.Adapter.Transaction" do
-    setup do
-      :mnesia.clear_table(@table_name)
-
-      :ok
-    end
-
     test "#transaction should execute" do
       assert {:ok, _} =
                TestRepo.transaction(fn ->

@@ -1,5 +1,5 @@
 defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
-  use ExUnit.Case, async: false
+  use Ecto.Adapters.Mnesia.RepoCase, async: false
 
   require Ecto.Query
 
@@ -110,62 +110,17 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
   end
 
   setup_all do
-    ExUnit.CaptureLog.capture_log(fn -> Mnesia.storage_up(nodes: [node()]) end)
-    Mnesia.ensure_all_started([], :permanent)
-    {:ok, _repo} = TestRepo.start_link()
-
-    :mnesia.create_table(@table_name,
-      ram_copies: [node()],
-      record_name: TestSchema,
-      attributes: [:id, :field, :inserted_at, :updated_at],
-      storage_properties: [ets: [:compressed]],
-      type: :ordered_set
-    )
-
-    :mnesia.create_table(@alt_record_table_name,
-      ram_copies: [node()],
-      record_name: @alt_record_name,
-      attributes: [:id, :field],
-      storage_properties: [ets: [:compressed]],
-      type: :ordered_set
-    )
-
-    :mnesia.create_table(@array_table_name,
-      ram_copies: [node()],
-      record_name: ArrayTestSchema,
-      attributes: [:id, :field, :inserted_at, :updated_at],
-      storage_properties: [ets: [:compressed]],
-      type: :ordered_set
-    )
-
-    :mnesia.create_table(@binary_id_table_name,
-      ram_copies: [node()],
-      record_name: BinaryIdTestSchema,
-      attributes: [:id, :field, :inserted_at, :updated_at],
-      storage_properties: [ets: [:compressed]],
-      type: :ordered_set
-    )
-
-    :mnesia.create_table(@without_primary_key_table_name,
-      ram_copies: [node()],
-      record_name: WithoutPrimaryKeyTestSchema,
-      attributes: [:field, :inserted_at, :updated_at],
-      storage_properties: [ets: [:compressed]],
-      type: :ordered_set
-    )
-
-    :mnesia.create_table(@multiple_primary_key_table_name,
-      ram_copies: [node()],
-      record_name: MultiplePrimaryKeyTestSchema,
-      attributes: [:__key__, :key1, :key2, :field, :inserted_at, :updated_at],
-      storage_properties: [ets: [:compressed]],
-      index: [:key1, :key2]
-    )
-
-    :mnesia.wait_for_tables(
-      [@table_name, @binary_id_table_name, @multiple_primary_key_table_name],
-      1000
-    )
+    [
+      TestSchema,
+      TestSchemaAltRecord,
+      ArrayTestSchema,
+      BinaryIdTestSchema,
+      WithoutPrimaryKeyTestSchema,
+      MultiplePrimaryKeyTestSchema
+    ]
+    |> Enum.each(fn schema ->
+      :ok = Mnesia.Migration.sync_create_table(schema, ram_copies: [node()], type: :ordered_set)
+    end)
   end
 
   describe "Ecto.Adapters.Schema#insert" do

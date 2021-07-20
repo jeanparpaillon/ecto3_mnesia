@@ -1,5 +1,5 @@
 defmodule Ecto.Adapters.Mnesia.UpsertTest do
-  use ExUnit.Case, async: false
+  use Ecto.Adapters.Mnesia.RepoCase, async: false
 
   require Record
 
@@ -30,23 +30,7 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
   end
 
   setup_all do
-    ExUnit.CaptureLog.capture_log(fn -> Mnesia.storage_up(nodes: [node()]) end)
-    Mnesia.ensure_all_started([], :permanent)
-    {:ok, _repo} = TestRepo.start_link()
-
-    :mnesia.create_table(@table_name,
-      ram_copies: [node()],
-      record_name: :rec,
-      attributes: [:id, :field1, :field2, :field3, :inserted_at, :updated_at],
-      storage_properties: [ets: [:compressed]],
-      type: :ordered_set
-    )
-
-    :mnesia.wait_for_tables([@table_name], 1000)
-
-    on_exit(fn ->
-      :mnesia.clear_table(@table_name)
-    end)
+    :ok = Mnesia.Migration.sync_create_table(TestSchema, ram_copies: [node()], type: :ordered_set)
 
     []
   end

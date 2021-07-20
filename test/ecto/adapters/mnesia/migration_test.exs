@@ -1,5 +1,5 @@
 defmodule Ecto.Adapters.Mnesia.MigrationTest do
-  use ExUnit.Case, async: false
+  use Ecto.Adapters.Mnesia.RepoCase, async: false
 
   alias Ecto.Adapters.Mnesia.Migration
   alias Ecto.Adapters.Mnesia.Source
