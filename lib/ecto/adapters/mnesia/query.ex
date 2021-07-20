@@ -1,10 +1,13 @@
 defmodule Ecto.Adapters.Mnesia.Query do
   @moduledoc false
+
+  require Qlc
+
+  alias Ecto.Query.BooleanExpr
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Record
   alias Ecto.Adapters.Mnesia.Source
   alias Ecto.Query.QueryExpr
-  require Qlc
 
   defstruct original: nil,
             type: nil,
@@ -29,20 +32,12 @@ defmodule Ecto.Adapters.Mnesia.Query do
   def from_ecto_query(
         type,
         %Ecto.Query{
-          select: select,
-          joins: joins,
           sources: sources,
-          wheres: wheres,
-          updates: updates,
-          order_bys: order_bys,
-          limit: limit,
-          offset: offset
+          updates: updates
         } = original
       ) do
     sources = sources(sources)
-    query = Mnesia.Qlc.query(select, joins, sources).(wheres)
-    sort = Mnesia.Qlc.sort(order_bys, select, sources)
-    answers = Mnesia.Qlc.answers(limit, offset)
+    {query, sort, answers} = build_query(original)
     new_record = new_record(Enum.at(sources, 0), updates)
 
     %Mnesia.Query{
@@ -55,6 +50,77 @@ defmodule Ecto.Adapters.Mnesia.Query do
       new_record: new_record
     }
   end
+
+  defp build_query(
+         %Ecto.Query{
+           select: select,
+           joins: joins,
+           sources: sources,
+           wheres: wheres,
+           order_bys: order_bys,
+           limit: limit,
+           offset: offset
+         } = original
+       ) do
+    sources = sources(sources)
+
+    case get_query?(original) do
+      true ->
+        {
+          Mnesia.Get.query(select, joins, sources).(wheres),
+          Mnesia.Get.sort(order_bys, select, sources),
+          Mnesia.Get.answers(limit, offset)
+        }
+
+      false ->
+        {
+          Mnesia.Qlc.query(select, joins, sources).(wheres),
+          Mnesia.Qlc.sort(order_bys, select, sources),
+          Mnesia.Qlc.answers(limit, offset)
+        }
+    end
+  end
+
+  defp get_query?(%Ecto.Query{
+         select: select,
+         sources: {source},
+         wheres: [where]
+       }) do
+    [source] = sources({source})
+
+    case source.schema.__schema__(:primary_key) do
+      [pk] ->
+        !join_query?(select) &&
+          pk_query?(where, pk)
+
+      _ ->
+        false
+    end
+  end
+
+  defp get_query?(_), do: false
+
+  defp join_query?(%Ecto.Query.SelectExpr{fields: fields}) do
+    Enum.any?(fields, fn
+      ({{:., [type: :id], _}, [], []}) -> true
+      _ -> false
+    end)
+  end
+
+  defp join_query?(_), do: false
+
+  defp pk_query?(
+         %BooleanExpr{
+           expr:
+             {:==, [],
+              [{{:., [], [{:&, [], [_source_index]}, field]}, [], []}, {:^, [], [_index]}]}
+         },
+         pk
+       )
+       when field == pk,
+       do: true
+
+  defp pk_query?(_, _), do: false
 
   defp sources(sources) do
     sources

@@ -50,6 +50,10 @@ defmodule Ecto.Adapters.Mnesia.Source do
     schema.__schema__(:fields)
   end
 
+  def index(%{index: index}, attribute) do
+    Map.get!(index, attribute)
+  end
+
   @doc false
   @spec uniques(t(), Keyword.t()) :: [{atom(), term()}]
   def uniques(%{schema: schema}, params) do
