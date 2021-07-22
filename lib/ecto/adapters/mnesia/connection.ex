@@ -8,7 +8,13 @@ defmodule Ecto.Adapters.Mnesia.Connection do
   @id_seq_table_name :id_seq
 
   def start_link(config) do
-    GenServer.start_link(Connection, [config], name: __MODULE__)
+    Connection
+    |> GenServer.start_link([config], name: __MODULE__)
+    |> case do
+      {:ok, pid} -> {:ok, pid}
+      {:error, {:already_started, pid}} -> {:ok, pid}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   @impl GenServer
