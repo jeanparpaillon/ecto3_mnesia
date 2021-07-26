@@ -77,5 +77,26 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
       assert {:error, :rec2, %Changeset{errors: [id: {"has already been taken", _}]}, %{rec1: _}} =
                ret
     end
+
+    test "in parallel - ensure no cyclic locks" do
+      insert = fn i ->
+        Multi.new()
+        |> Multi.run(:all, fn repo, _ ->
+          {:ok, repo.all(TestSchema)}
+        end)
+        |> Multi.insert(:write, TestSchema.changeset(field: "#{i}"))
+        |> Multi.run(:read, fn repo, %{write: %{id: j}} ->
+          {:ok, repo.get(TestSchema, j)}
+        end)
+        |> TestRepo.transaction()
+      end
+
+      1..100
+      |> Enum.map(&Task.async(fn -> insert.(&1) end))
+      |> Enum.map(&Task.await/1)
+      |> Enum.each(fn ret ->
+        assert {:ok, _} = ret
+      end)
+    end
   end
 end
