@@ -549,15 +549,7 @@ defmodule Ecto.Adapters.Mnesia do
     case in_transaction?(meta) do
       true ->
         # mnesia atomic operations (write, etc) always end with :ok or interrupts with exceptions
-        try do
-          {:atomic, fun.()}
-        catch
-          :exit, {:aborted, reason} ->
-            {:aborted, reason}
-
-          :exit, reason ->
-            {:aborted, reason}
-        end
+        {:atomic, fun.()}
 
       false ->
         :mnesia.transaction(fun)
