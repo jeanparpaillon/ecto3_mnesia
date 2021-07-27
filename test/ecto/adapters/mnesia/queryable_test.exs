@@ -432,7 +432,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       assert [record] = TestRepo.all(from(s in TestSchema, where: not is_nil(s.field)))
       assert record.id == 2
 
-      assert [record] = TestRepo.all(from(s in TestSchema, where: not (s.id in ^[2, 3])))
+      assert [record] = TestRepo.all(from(s in TestSchema, where: s.id not in ^[2, 3]))
       assert record.id == 1
 
       :mnesia.clear_table(@table_name)

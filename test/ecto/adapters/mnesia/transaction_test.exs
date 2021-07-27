@@ -41,6 +41,12 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
   end
 
   describe "Ecto.Adapter.Transaction" do
+    setup do
+      :mnesia.clear_table(@table_name)
+
+      :ok
+    end
+
     test "#transaction should execute" do
       assert TestRepo.transaction(fn ->
                TestRepo.all(TestSchema)
