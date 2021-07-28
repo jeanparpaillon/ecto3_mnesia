@@ -368,10 +368,10 @@ defmodule Ecto.Adapters.Mnesia do
   def update(_adapter_meta, schema_meta, params, filters, returning, _opts) do
     source = Source.new(schema_meta)
     answers_context = [params: params]
-    query = Mnesia.Qlc.query(:all, [], [source]).(filters)
+    query = Mnesia.Query.Qlc.query(:all, [], [source]).(filters)
 
     with {selectTime, {:atomic, [attributes]}} <-
-           tc_tx(fn -> query.(params) |> Mnesia.Qlc.answers(nil, nil).(answers_context) end),
+           tc_tx(fn -> query.(params) |> Mnesia.Query.Qlc.answers(nil, nil).(answers_context) end),
          {updateTime, {:atomic, update}} <-
            tc_tx(fn -> do_update(attributes, params, source) end) do
       result = Record.select(update, returning, source)
@@ -401,12 +401,12 @@ defmodule Ecto.Adapters.Mnesia do
   @impl Ecto.Adapter.Schema
   def delete(_adapter_meta, schema_meta, filters, _opts) do
     source = Source.new(schema_meta)
-    query = Mnesia.Qlc.query(:all, [], [source]).(filters)
+    query = Mnesia.Query.Qlc.query(:all, [], [source]).(filters)
 
     with {selectTime, {:atomic, [[id | _t]]}} <-
            tc_tx(fn ->
              query.([])
-             |> Mnesia.Qlc.answers(nil, nil).(params: [])
+             |> Mnesia.Query.Qlc.answers(nil, nil).(params: [])
              |> Enum.map(&Tuple.to_list(&1))
            end),
          {deleteTime, {:atomic, :ok}} <-

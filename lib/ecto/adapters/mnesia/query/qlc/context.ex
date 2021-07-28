@@ -1,4 +1,4 @@
-defmodule Ecto.Adapters.Mnesia.Qlc.Context do
+defmodule Ecto.Adapters.Mnesia.Query.Qlc.Context do
   @moduledoc false
 
   alias Ecto.Adapters.Mnesia.Source

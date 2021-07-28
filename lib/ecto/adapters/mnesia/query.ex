@@ -5,6 +5,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
 
   alias Ecto.Query.BooleanExpr
   alias Ecto.Adapters.Mnesia
+  alias Ecto.Adapters.Mnesia.Query
   alias Ecto.Adapters.Mnesia.Record
   alias Ecto.Adapters.Mnesia.Source
   alias Ecto.Query.QueryExpr
@@ -67,16 +68,16 @@ defmodule Ecto.Adapters.Mnesia.Query do
     case get_query?(original) do
       true ->
         {
-          Mnesia.Get.query(select, joins, sources).(wheres),
-          Mnesia.Get.sort(order_bys, select, sources),
-          Mnesia.Get.answers(limit, offset)
+          Query.Get.query(select, joins, sources).(wheres),
+          Query.Get.sort(order_bys, select, sources),
+          Query.Get.answers(limit, offset)
         }
 
       false ->
         {
-          Mnesia.Qlc.query(select, joins, sources).(wheres),
-          Mnesia.Qlc.sort(order_bys, select, sources),
-          Mnesia.Qlc.answers(limit, offset)
+          Query.Qlc.query(select, joins, sources).(wheres),
+          Query.Qlc.sort(order_bys, select, sources),
+          Query.Qlc.answers(limit, offset)
         }
     end
   end

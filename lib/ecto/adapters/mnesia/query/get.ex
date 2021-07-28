@@ -1,4 +1,7 @@
-defmodule Ecto.Adapters.Mnesia.Get do
+defmodule Ecto.Adapters.Mnesia.Query.Get do
+  @moduledoc """
+  Query builder for simple `Repo.get` like queries
+  """
   alias Ecto.Adapters.Mnesia.Source
   alias Ecto.Query.BooleanExpr
 

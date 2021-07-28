@@ -1,8 +1,8 @@
-defmodule Ecto.Adapters.Mnesia.Qlc do
+defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   @moduledoc false
   require Qlc
 
-  alias Ecto.Adapters.Mnesia.Qlc.Context
+  alias Ecto.Adapters.Mnesia.Query.Qlc.Context
   alias Ecto.Adapters.Mnesia.Source
   alias Ecto.Query.BooleanExpr
   alias Ecto.Query.QueryExpr
