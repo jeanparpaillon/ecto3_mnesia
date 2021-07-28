@@ -48,9 +48,10 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
     end
 
     test "#transaction should execute" do
-      assert TestRepo.transaction(fn ->
-               TestRepo.all(TestSchema)
-             end) == {:ok, []}
+      assert {:ok, _} =
+               TestRepo.transaction(fn ->
+                 TestRepo.all(TestSchema)
+               end)
     end
 
     test "#rollback should rollback" do
@@ -72,12 +73,16 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
 
   describe "Ecto.Multi" do
     test "Rollback when insert conflict" do
-      changeset = TestSchema.changeset(id: 1)
-
       ret =
         Multi.new()
-        |> Multi.insert(:rec1, changeset)
-        |> Multi.insert(:rec2, changeset, on_conflict: :raise)
+        |> Multi.insert(:rec1, TestSchema.changeset(id: 1))
+        |> Multi.insert(
+          :rec2,
+          fn %{rec1: %{id: id}} ->
+            TestSchema.changeset(id: id)
+          end,
+          on_conflict: :raise
+        )
         |> TestRepo.transaction()
 
       assert {:error, :rec2, %Changeset{errors: [id: {"has already been taken", _}]}, %{rec1: _}} =
