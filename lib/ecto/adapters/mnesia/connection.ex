@@ -4,8 +4,9 @@ defmodule Ecto.Adapters.Mnesia.Connection do
 
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
+  alias Ecto.Adapters.Mnesia.Constraint
 
-  @id_seq_table_name :id_seq
+  @id_seq_table_name :mnesia_id_seq
 
   def start_link(config) do
     Connection
@@ -47,15 +48,24 @@ defmodule Ecto.Adapters.Mnesia.Connection do
   def ensure_id_seq_table(nodes) when is_list(nodes) do
     case :mnesia.create_table(@id_seq_table_name,
            disc_copies: nodes,
-           attributes: [:id, :_dummy],
+           attributes: [:id, :seq],
            type: :set,
-           storage_properties: [dets: [auto_save: 5_000]]
+           storage_properties: [dets: [auto_save: 5_000]],
+           load_order: 100
          ) do
       {:atomic, :ok} ->
         :mnesia.wait_for_tables([@id_seq_table_name], 1_000)
 
       {:aborted, {:already_exists, @id_seq_table_name}} ->
-        :already_exists
+        :ok
     end
+  end
+
+  def ensure_constraints_table(nil) do
+    ensure_constraints_table([node()])
+  end
+
+  def ensure_constraints_table(nodes) when is_list(nodes) do
+    Constraint.ensure_table(nodes)
   end
 end

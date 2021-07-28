@@ -33,7 +33,7 @@ defmodule Ecto.Adapters.Mnesia.Record do
       if replace == :all or Enum.member?(replace, field) do
         case source.index[field] do
           nil ->
-            # Association or vitual field
+            # Association or virtual field
             acc
 
           field_index ->
@@ -51,6 +51,10 @@ defmodule Ecto.Adapters.Mnesia.Record do
   @spec select(t(), [atom()], Source.t()) :: Schema.fields()
   def select(record, fields, %{index: index}) do
     Enum.map(fields, &{&1, elem(record, index[&1])})
+  end
+
+  def select_all(record, %{index: index, attributes: attributes}) do
+    Enum.map(attributes, &{&1, elem(record, index[&1])})
   end
 
   @spec to_schema(t(), Source.t()) :: Ecto.Schema.t()
@@ -85,12 +89,17 @@ defmodule Ecto.Adapters.Mnesia.Record do
   defp maybe_update_key(record, field, field_index, %{extra_key: extra_key}) do
     case Map.fetch(extra_key, field) do
       {:ok, key_index} ->
-        key =
-          record
-          |> elem(1)
-          |> put_elem(key_index, elem(record, field_index))
+        record
+        |> elem(1)
+        |> case do
+          :_ ->
+            # Ignore record pattern
+            record
 
-        put_elem(record, 1, key)
+          key ->
+            key = put_elem(key, key_index, elem(record, field_index))
+            put_elem(record, 1, key)
+        end
 
       :error ->
         record

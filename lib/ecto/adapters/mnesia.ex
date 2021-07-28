@@ -100,6 +100,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
+  alias Ecto.Adapters.Mnesia.Constraint
   alias Ecto.Adapters.Mnesia.Record
   alias Ecto.Adapters.Mnesia.Source
 
@@ -372,16 +373,7 @@ defmodule Ecto.Adapters.Mnesia do
     with {selectTime, {:atomic, [attributes]}} <-
            tc_tx(fn -> query.(params) |> Mnesia.Qlc.answers(nil, nil).(answers_context) end),
          {updateTime, {:atomic, update}} <-
-           tc_tx(fn ->
-             updated =
-               attributes
-               |> Record.new(source)
-               |> Record.update(params, source)
-
-             with :ok <- :mnesia.write(source.table, updated, :write) do
-               updated
-             end
-           end) do
+           tc_tx(fn -> do_update(attributes, params, source) end) do
       result = Record.select(update, returning, source)
 
       Logger.debug(
@@ -402,7 +394,7 @@ defmodule Ecto.Adapters.Mnesia do
           "QUERY ERROR source=#{inspect(source.table)} type=update db=#{time}µs #{inspect(constraints)}"
         )
 
-        {:invalid, {:invalid, constraints}}
+        {:invalid, constraints}
     end
   end
 
@@ -485,7 +477,8 @@ defmodule Ecto.Adapters.Mnesia do
       end
 
     with :ok <- :mnesia.start(),
-         id_seq when id_seq in [:ok, :already_exists] <- Connection.ensure_id_seq_table(nodes) do
+         id_seq when id_seq in [:ok, :already_exists] <- Connection.ensure_id_seq_table(nodes),
+         cons when cons in [:ok, :alread_exists] <- Connection.ensure_constraints_table(nodes) do
       ret
     end
   end
@@ -551,12 +544,31 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   defp do_insert(params, source) do
-    record =
-      params
-      |> Record.gen_id(source)
-      |> Record.new(source)
+    params = Record.gen_id(params, source)
 
-    with :ok <- :mnesia.write(source.table, record, :write), do: [record]
+    with {:constraints, []} <- {:constraints, Constraint.check(source, params)},
+         record = Record.new(params, source),
+         :ok <- :mnesia.write(source.table, record, :write) do
+      [record]
+    else
+      {:constraints, constraints} -> :mnesia.abort({:invalid, constraints})
+    end
+  end
+
+  defp do_update(orig, updates, source) do
+    updated =
+      orig
+      |> Record.new(source)
+      |> Record.update(updates, source)
+
+    params = Record.select(updated, source.attributes, source)
+
+    with {:constraints, []} <- {:constraints, Constraint.check(source, params)},
+         :ok <- :mnesia.write(source.table, updated, :write) do
+      updated
+    else
+      {:constraints, constraints} -> :mnesia.abort({:invalid, constraints})
+    end
   end
 
   defp conflict?(params, source, %{repo: repo}) do

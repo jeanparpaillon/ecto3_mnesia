@@ -2,6 +2,7 @@ defmodule Ecto.Adapters.Mnesia.Migration do
   @moduledoc """
   Functions for dealing with schema migrations
   """
+  alias Ecto.Adapters.Mnesia.Constraint
   alias Ecto.Adapters.Mnesia.Source
 
   @type table() :: atom()
@@ -82,6 +83,20 @@ defmodule Ecto.Adapters.Mnesia.Migration do
       {:atomic, :ok} -> :ok
       {:aborted, {:no_exists, ^table}} -> :ok
       {:aborted, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Add a foreign key constraint
+  """
+  @spec references(module(), atom(), Constraint.ForeignKey.opts()) :: :ok | {:error, term()}
+  def references(from, relation, opts \\ []) do
+    %{schema: from}
+    |> Source.new()
+    |> Constraint.ForeignKey.new(relation, opts)
+    |> case do
+      %Constraint.ForeignKey{errors: []} = c -> Constraint.register(c)
+      c -> {:error, c.errors}
     end
   end
 
