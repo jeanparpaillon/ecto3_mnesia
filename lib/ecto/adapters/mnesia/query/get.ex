@@ -9,10 +9,13 @@ defmodule Ecto.Adapters.Mnesia.Query.Get do
   @behaviour Query
 
   def query(_select, _joins, [%Source{table: table}]) do
-    fn [%BooleanExpr{
-         expr:
-           {:==, [], [{{:., [], [{:&, [], [_source_index]}, _field]}, [], []}, {:^, [], [index]}]}
-       }] ->
+    fn [
+         %BooleanExpr{
+           expr:
+             {:==, [],
+              [{{:., [], [{:&, [], [_source_index]}, _field]}, [], []}, {:^, [], [index]}]}
+         }
+       ] ->
       fn params ->
         :mnesia.read(table, Enum.at(params, index))
         |> Enum.map(fn record -> Tuple.delete_at(record, 0) end)

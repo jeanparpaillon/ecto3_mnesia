@@ -33,10 +33,10 @@ defmodule Ecto.Adapters.Mnesia.Query do
           new_record: (tuple(), list() -> tuple())
         }
 
-        defmodule ImplSelector do
-          @moduledoc false
-          defstruct single_pkey?: false, join_query?: false, pk_query?: false, pk: nil
-        end
+  defmodule ImplSelector do
+    @moduledoc false
+    defstruct single_pkey?: false, join_query?: false, pk_query?: false, pk: nil
+  end
 
   @callback query(select :: term(), joins :: term(), sources :: term()) ::
               (params :: term() -> term())
@@ -102,7 +102,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
       {{:., [type: :id], _}, [], []} -> true
       _ -> false
     end)
-    |> (& %{acc | join_query?: &1}).()
+    |> (&%{acc | join_query?: &1}).()
   end
 
   defp join_query?(acc, _), do: %{acc | join_query?: false}
