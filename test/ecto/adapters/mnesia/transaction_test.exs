@@ -56,7 +56,7 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
     test "Rollback when insert conflict" do
       ret =
         Multi.new()
-        |> Multi.insert(:rec1, TestSchema.changeset(id: 1))
+        |> Multi.insert(:rec1, TestSchema.changeset([]))
         |> Multi.insert(
           :rec2,
           fn %{rec1: %{id: id}} ->
