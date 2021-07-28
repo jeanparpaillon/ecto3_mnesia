@@ -11,8 +11,8 @@ defmodule Ecto.Adapters.Mnesia.AutogenerateTest do
 
     @primary_key false
     schema "#{Ecto.Adapters.Mnesia.AutogenerateTest.Table}" do
-      field :id, :id, autogenerate: true, primary_key: true, source: :pkey
-      field :field, :string
+      field(:id, :id, autogenerate: true, primary_key: true, source: :pkey)
+      field(:field, :string)
       timestamps()
     end
   end

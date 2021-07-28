@@ -140,7 +140,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Queryable
   def execute(
-        adapter_meta,
+        _adapter_meta,
         _query_meta,
         {:nocache,
          %Mnesia.Query{
@@ -155,15 +155,12 @@ defmodule Ecto.Adapters.Mnesia do
       ) do
     context = [params: params]
 
-    case :timer.tc(&mnesia_transaction_wrapper/2, [
-           adapter_meta,
-           fn ->
-             query.(params)
-             |> sort.()
-             |> answers.(context)
-             |> Enum.map(&Tuple.to_list(&1))
-           end
-         ]) do
+    case tc_tx(fn ->
+           query.(params)
+           |> sort.()
+           |> answers.(context)
+           |> Enum.map(&Tuple.to_list(&1))
+         end) do
       {time, {:atomic, result}} ->
         Logger.debug("QUERY OK sources=#{inspect(sources)} type=all db=#{time}µs")
 
@@ -179,7 +176,7 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   def execute(
-        adapter_meta,
+        _adapter_meta,
         _query_meta,
         {:nocache,
          %Mnesia.Query{
@@ -194,33 +191,26 @@ defmodule Ecto.Adapters.Mnesia do
       ) do
     answers_context = [params: params]
 
-    case :timer.tc(&mnesia_transaction_wrapper/2, [
-           adapter_meta,
-           fn ->
-             query.(params)
-             |> answers.(answers_context)
-             |> Enum.map(&new_record.(&1, params))
-             |> Enum.map(fn record ->
-               with :ok <- :mnesia.write(source.table, record, :write) do
-                 Record.to_schema(record, source)
-               end
-             end)
-           end
-         ]) do
+    case tc_tx(fn ->
+           query.(params)
+           |> answers.(answers_context)
+           |> Enum.map(&new_record.(&1, params))
+           |> Enum.map(fn record ->
+             with :ok <- :mnesia.write(source.table, record, :write) do
+               Record.to_schema(record, source)
+             end
+           end)
+         end) do
       {time, {:atomic, result}} ->
         Logger.debug(
-          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{
-            time
-          }µs"
+          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{time}µs"
         )
 
         {length(result), result}
 
       {time, {:aborted, error}} ->
         Logger.debug(
-          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{
-            time
-          }µs #{inspect(error)}"
+          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{time}µs #{inspect(error)}"
         )
 
         {0, nil}
@@ -228,7 +218,7 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   def execute(
-        adapter_meta,
+        _adapter_meta,
         _query_meta,
         {:nocache,
          %Mnesia.Query{
@@ -243,24 +233,19 @@ defmodule Ecto.Adapters.Mnesia do
       ) do
     context = [params: params]
 
-    case :timer.tc(&mnesia_transaction_wrapper/2, [
-           adapter_meta,
-           fn ->
-             query.(params)
-             |> answers.(context)
-             |> Enum.map(fn tuple ->
-               # Works only if query selects id at first, see: https://gitlab.com/patatoid/ecto3_mnesia/-/issues/15
-               id = elem(tuple, 0)
-               :mnesia.delete(source.table, id, :write)
-               Tuple.to_list(tuple)
-             end)
-           end
-         ]) do
+    case tc_tx(fn ->
+           query.(params)
+           |> answers.(context)
+           |> Enum.map(fn tuple ->
+             # Works only if query selects id at first, see: https://gitlab.com/patatoid/ecto3_mnesia/-/issues/15
+             id = elem(tuple, 0)
+             :mnesia.delete(source.table, id, :write)
+             Tuple.to_list(tuple)
+           end)
+         end) do
       {time, {:atomic, records}} ->
         Logger.debug(
-          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{
-            time
-          }µs"
+          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{time}µs"
         )
 
         result =
@@ -273,9 +258,7 @@ defmodule Ecto.Adapters.Mnesia do
 
       {time, {:aborted, error}} ->
         Logger.debug(
-          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{
-            time
-          }µs #{inspect(error)}"
+          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{time}µs #{inspect(error)}"
         )
 
         {0, nil}
@@ -284,20 +267,17 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Queryable
   def stream(
-        adapter_meta,
+        _adapter_meta,
         _query_meta,
         {:nocache, %Mnesia.Query{query: query, answers: answers}},
         params,
         _opts
       ) do
-    case mnesia_transaction_wrapper(
-           adapter_meta,
-           fn ->
-             query.(params)
-             |> answers.()
-             |> Enum.map(&Tuple.to_list(&1))
-           end
-         ) do
+    case :mnesia.transaction(fn ->
+           query.(params)
+           |> answers.()
+           |> Enum.map(&Tuple.to_list(&1))
+         end) do
       {:atomic, result} ->
         result
 
@@ -323,23 +303,18 @@ defmodule Ecto.Adapters.Mnesia do
   def insert(adapter_meta, schema_meta, params, on_conflict, returning, _opts) do
     source = Source.new(schema_meta)
 
-    case :timer.tc(&mnesia_transaction_wrapper/2, [
-           adapter_meta,
-           fn -> upsert(source, params, on_conflict, adapter_meta) end
-         ]) do
+    case tc_tx(fn -> upsert(source, params, on_conflict, adapter_meta) end) do
       {time, {:atomic, [record]}} ->
         result = Record.select(record, returning, source)
         Logger.debug("QUERY OK source=#{inspect(schema_meta.source)} type=insert db=#{time}µs")
         {:ok, result}
 
-      {time, {:aborted, error}} ->
+      {time, {:aborted, {:invalid, constraints}}} ->
         Logger.debug(
-          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert db=#{time}µs #{
-            inspect(error)
-          }"
+          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert db=#{time}µs #{inspect(constraints)}"
         )
 
-        {:invalid, error}
+        {:invalid, constraints}
     end
   end
 
@@ -360,14 +335,11 @@ defmodule Ecto.Adapters.Mnesia do
   defp do_insert_all(adapter_meta, schema_meta, _header, records, on_conflict, returning, _opts) do
     source = Source.new(schema_meta)
 
-    case :timer.tc(&mnesia_transaction_wrapper/2, [
-           adapter_meta,
-           fn ->
-             Enum.map(records, fn params ->
-               upsert(source, params, on_conflict, adapter_meta)
-             end)
-           end
-         ]) do
+    case tc_tx(fn ->
+           Enum.map(records, fn params ->
+             upsert(source, params, on_conflict, adapter_meta)
+           end)
+         end) do
       {time, {:atomic, created_records}} ->
         result =
           Enum.map(created_records, fn [record] ->
@@ -382,11 +354,9 @@ defmodule Ecto.Adapters.Mnesia do
 
         {length(result), result}
 
-      {time, {:aborted, error}} ->
+      {time, {:aborted, {:invalid, constraints}}} ->
         Logger.debug(
-          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert_all db=#{time}µs #{
-            inspect(error)
-          }"
+          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert_all db=#{time}µs #{inspect(constraints)}"
         )
 
         {0, nil}
@@ -394,32 +364,24 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   @impl Ecto.Adapter.Schema
-  def update(adapter_meta, schema_meta, params, filters, returning, _opts) do
+  def update(_adapter_meta, schema_meta, params, filters, returning, _opts) do
     source = Source.new(schema_meta)
     answers_context = [params: params]
     query = Mnesia.Qlc.query(:all, [], [source]).(filters)
 
     with {selectTime, {:atomic, [attributes]}} <-
-           :timer.tc(&mnesia_transaction_wrapper/2, [
-             adapter_meta,
-             fn ->
-               query.(params) |> Mnesia.Qlc.answers(nil, nil).(answers_context)
-             end
-           ]),
+           tc_tx(fn -> query.(params) |> Mnesia.Qlc.answers(nil, nil).(answers_context) end),
          {updateTime, {:atomic, update}} <-
-           :timer.tc(&mnesia_transaction_wrapper/2, [
-             adapter_meta,
-             fn ->
-               updated =
-                 attributes
-                 |> Record.new(source)
-                 |> Record.update(params, source)
+           tc_tx(fn ->
+             updated =
+               attributes
+               |> Record.new(source)
+               |> Record.update(params, source)
 
-               with :ok <- :mnesia.write(source.table, updated, :write) do
-                 updated
-               end
+             with :ok <- :mnesia.write(source.table, updated, :write) do
+               updated
              end
-           ]) do
+           end) do
       result = Record.select(update, returning, source)
 
       Logger.debug(
@@ -435,35 +397,30 @@ defmodule Ecto.Adapters.Mnesia do
 
         {:error, :stale}
 
-      {time, {:aborted, error}} ->
+      {time, {:aborted, {:invalid, constraints}}} ->
         Logger.debug(
-          "QUERY ERROR source=#{inspect(source.table)} type=update db=#{time}µs #{inspect(error)}"
+          "QUERY ERROR source=#{inspect(source.table)} type=update db=#{time}µs #{inspect(constraints)}"
         )
 
-        {:invalid, [mnesia: "#{inspect(error)}"]}
+        {:invalid, {:invalid, constraints}}
     end
   end
 
   @impl Ecto.Adapter.Schema
-  def delete(adapter_meta, schema_meta, filters, _opts) do
+  def delete(_adapter_meta, schema_meta, filters, _opts) do
     source = Source.new(schema_meta)
     query = Mnesia.Qlc.query(:all, [], [source]).(filters)
 
     with {selectTime, {:atomic, [[id | _t]]}} <-
-           :timer.tc(&mnesia_transaction_wrapper/2, [
-             adapter_meta,
-             fn ->
-               query.([])
-               |> Mnesia.Qlc.answers(nil, nil).(params: [])
-               |> Enum.map(&Tuple.to_list(&1))
-             end
-           ]),
+           tc_tx(fn ->
+             query.([])
+             |> Mnesia.Qlc.answers(nil, nil).(params: [])
+             |> Enum.map(&Tuple.to_list(&1))
+           end),
          {deleteTime, {:atomic, :ok}} <-
-           :timer.tc(:mnesia, :transaction, [
-             fn ->
-               :mnesia.delete(source.table, id, :write)
-             end
-           ]) do
+           tc_tx(fn ->
+             :mnesia.delete(source.table, id, :write)
+           end) do
       Logger.debug(
         "QUERY OK source=#{inspect(source.table)} type=delete db=#{selectTime + deleteTime}µs"
       )
@@ -477,12 +434,12 @@ defmodule Ecto.Adapters.Mnesia do
 
         {:error, :stale}
 
-      {time, {:aborted, error}} ->
+      {time, {:aborted, constraints}} ->
         Logger.debug(
-          "QUERY ERROR source=#{inspect(source.table)} type=delete db=#{time}µs #{inspect(error)}"
+          "QUERY ERROR source=#{inspect(source.table)} type=delete db=#{time}µs #{inspect(constraints)}"
         )
 
-        {:invalid, [mnesia: "#{inspect(error)}"]}
+        {:invalid, constraints}
     end
   end
 
@@ -490,10 +447,8 @@ defmodule Ecto.Adapters.Mnesia do
   def in_transaction?(_adapter_meta), do: :mnesia.is_transaction()
 
   @impl Ecto.Adapter.Transaction
-  def transaction(_adapter_meta, _options, function) do
-    case :mnesia.transaction(fn ->
-           function.()
-         end) do
+  def transaction(_adapter_meta, _options, function) when is_function(function, 0) do
+    case :mnesia.transaction(function) do
       {:atomic, result} -> {:ok, result}
       {:aborted, reason} -> {:error, reason}
     end
@@ -543,34 +498,13 @@ defmodule Ecto.Adapters.Mnesia do
     end
   end
 
-  # Wraps a function and decides if executing it as part of an already existant transaction
-  # or wrapping it into a :mnesia.transaction block
-  defp mnesia_transaction_wrapper(meta, fun) do
-    case in_transaction?(meta) do
-      true ->
-        # mnesia atomic operations (write, etc) always end with :ok or interrupts with exceptions
-        try do
-          {:atomic, fun.()}
-        catch
-          :exit, {:aborted, reason} ->
-            {:aborted, reason}
-
-          :exit, reason ->
-            {:aborted, reason}
-        end
-
-      false ->
-        :mnesia.transaction(fun)
-    end
-  end
-
   defp upsert(source, params, {:raise, [], []}, adapter_meta) do
     case conflict?(params, source, adapter_meta) do
       nil ->
         do_insert(params, source)
 
       {_rec, constraints} ->
-        :mnesia.abort(constraints)
+        :mnesia.abort({:invalid, constraints})
     end
   end
 
@@ -643,4 +577,6 @@ defmodule Ecto.Adapters.Mnesia do
         end
     end
   end
+
+  defp tc_tx(fun), do: :timer.tc(:mnesia, :transaction, [fun])
 end
