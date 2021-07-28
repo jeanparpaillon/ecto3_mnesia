@@ -21,7 +21,8 @@ defmodule Ecto.Adapters.Mnesia.Query do
             query: nil,
             sort: nil,
             answers: nil,
-            new_record: nil
+            new_record: nil,
+            cache: :nocache
 
   @type t :: %__MODULE__{
           original: Ecto.Query.t(),
@@ -30,7 +31,8 @@ defmodule Ecto.Adapters.Mnesia.Query do
           query: (params :: list() -> query_handle :: :qlc.query_handle()),
           sort: (query_handle :: :qlc.query_handle() -> query_handle :: :qlc.query_handle()),
           answers: (query_handle :: :qlc.query_handle(), context :: Keyword.t() -> list(tuple())),
-          new_record: (tuple(), list() -> tuple())
+          new_record: (tuple(), list() -> tuple()),
+          cache: :nocache | :cache
         }
 
   defmodule ImplSelector do

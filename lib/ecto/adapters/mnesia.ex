@@ -136,7 +136,8 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Queryable
   def prepare(type, query) do
-    {:nocache, Connection.all(type, query)}
+    q = Connection.all(type, query)
+    {q.cache, q}
   end
 
   @impl Ecto.Adapter.Queryable
