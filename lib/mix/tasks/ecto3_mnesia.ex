@@ -44,7 +44,7 @@ defmodule Mix.Tasks.Ecto3Mnesia do
   end
 
   def run(["reset" | opts]) do
-    IO.inspect(:mnesia.delete_schema([node()]))
+    IO.puts(:mnesia.delete_schema([node()]))
     setup(opts)
   end
 

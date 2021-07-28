@@ -1,12 +1,17 @@
-defmodule Ecto.Adapters.Mnesia.Qlc do
-  @moduledoc false
+defmodule Ecto.Adapters.Mnesia.Query.Qlc do
+  @moduledoc """
+  Builds qlc query out of Ecto.Query
+  """
   require Qlc
 
-  alias Ecto.Adapters.Mnesia.Qlc.Context
+  alias Ecto.Adapters.Mnesia.Query
+  alias Ecto.Adapters.Mnesia.Query.Qlc.Context
   alias Ecto.Adapters.Mnesia.Source
   alias Ecto.Query.BooleanExpr
   alias Ecto.Query.QueryExpr
   alias Ecto.Query.SelectExpr
+
+  @behaviour Query
 
   @order_mapping %{
     asc: :ascending,
