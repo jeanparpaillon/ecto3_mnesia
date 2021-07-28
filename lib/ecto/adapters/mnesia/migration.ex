@@ -14,7 +14,7 @@ defmodule Ecto.Adapters.Mnesia.Migration do
   @type ram_copies_opt :: {:ram_copies, [node()]}
   @type storage_properties_opt :: {:storage_properties, [{atom(), term()}]}
   @type local_content_opt :: {:local_content, boolean()}
-  @type create_opts() :: [
+  @type create_opt() ::
           access_opt()
           | disc_copies_opt()
           | disc_only_copies_opt()
@@ -24,7 +24,8 @@ defmodule Ecto.Adapters.Mnesia.Migration do
           | ram_copies_opt()
           | storage_properties_opt()
           | local_content_opt()
-        ]
+  @type create_opts() :: [create_opt()]
+  @type sync_create_opts() :: [{:timeout, integer()} | create_opts()]
 
   @doc """
   Creates mnesia table.
@@ -49,6 +50,38 @@ defmodule Ecto.Adapters.Mnesia.Migration do
       {:atomic, :ok} -> {:ok, source.table}
       {:aborted, {:already_exists, _}} -> :ignore
       {:aborted, error} -> {:error, error}
+    end
+  end
+
+  @doc """
+  Creates table and wait for its creation
+  """
+  @spec sync_create_table(module(), sync_create_opts()) :: :ok | {:error, term()}
+  def sync_create_table(schema, opts \\ []) when is_list(opts) do
+    timeout = Keyword.get(opts, :timeout, 5_000)
+
+    case create_table(schema, opts) do
+      {:ok, table} -> wait_for_table(table, timeout)
+      :ignore -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Drop table
+
+  Returns ok if table has been deleted or did not exist
+  """
+  @spec drop_table(module()) :: :ok | {:error, term()}
+  def drop_table(schema) do
+    %{table: table} = Source.new(%{schema: schema})
+
+    table
+    |> :mnesia.delete_table()
+    |> case do
+      {:atomic, :ok} -> :ok
+      {:aborted, {:no_exists, ^table}} -> :ok
+      {:aborted, reason} -> {:error, reason}
     end
   end
 
@@ -82,8 +115,17 @@ defmodule Ecto.Adapters.Mnesia.Migration do
         :majority,
         :ram_copies,
         :storage_properties,
-        :local_content
+        :local_content,
+        :type
       ])
     )
+  end
+
+  defp wait_for_table(table, timeout) do
+    case :mnesia.wait_for_tables([table], timeout) do
+      :ok -> :ok
+      {:error, reason} -> {:error, reason}
+      {:timeout, [table]} -> {:error, {:timeout, table}}
+    end
   end
 end

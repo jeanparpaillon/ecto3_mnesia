@@ -1,5 +1,5 @@
 defmodule Ecto.Adapters.Mnesia.AutogenerateTest do
-  use ExUnit.Case, async: false
+  use Ecto.Adapters.Mnesia.RepoCase, async: false
 
   alias EctoMnesia.TestRepo, as: Repo
   alias Ecto.Adapters.Mnesia
@@ -18,13 +18,7 @@ defmodule Ecto.Adapters.Mnesia.AutogenerateTest do
   end
 
   setup_all do
-    ExUnit.CaptureLog.capture_log(fn -> Mnesia.storage_up(nodes: [node()]) end)
-
-    Mnesia.ensure_all_started([], :permanent)
-    {:ok, _repo} = Repo.start_link()
-
-    _ = Mnesia.Migration.create_table(TestSchema)
-    :mnesia.wait_for_tables([@table_name], 1000)
+    :ok = Mnesia.Migration.sync_create_table(TestSchema)
 
     on_exit(fn ->
       :mnesia.clear_table(@table_name)

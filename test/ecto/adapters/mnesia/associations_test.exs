@@ -1,5 +1,5 @@
 defmodule Ecto.Adapters.MnesiaAssociationsIntegrationTest do
-  use ExUnit.Case, async: false
+  use Ecto.Adapters.Mnesia.RepoCase, async: false
 
   alias EctoMnesia.TestRepo
   alias Ecto.Adapters.Mnesia
@@ -62,69 +62,10 @@ defmodule Ecto.Adapters.MnesiaAssociationsIntegrationTest do
   end
 
   setup_all do
-    ExUnit.CaptureLog.capture_log(fn -> Mnesia.storage_up(nodes: [node()]) end)
-    Mnesia.ensure_all_started([], :permanent)
-    {:ok, _repo} = TestRepo.start_link()
-
-    :mnesia.create_table(@has_many_table_name,
-      ram_copies: [node()],
-      record_name: HasManySchema,
-      attributes: [:id, :field],
-      storage_properties: [
-        ets: [:compressed]
-      ],
-      type: :ordered_set
-    )
-
-    :mnesia.create_table(@belongs_to_table_name,
-      ram_copies: [node()],
-      record_name: BelongsToSchema,
-      attributes: [:id, :field, :has_many_id],
-      storage_properties: [
-        ets: [:compressed]
-      ],
-      type: :ordered_set
-    )
-
-    :mnesia.create_table(@many_to_many_a_table_name,
-      ram_copies: [node()],
-      record_name: ManyToManySchemaA,
-      attributes: [:id, :field],
-      storage_properties: [
-        ets: [:compressed]
-      ],
-      type: :ordered_set
-    )
-
-    :mnesia.create_table(@many_to_many_b_table_name,
-      ram_copies: [node()],
-      record_name: ManyToManySchemaB,
-      attributes: [:id, :field],
-      storage_properties: [
-        ets: [:compressed]
-      ],
-      type: :ordered_set
-    )
-
-    :mnesia.create_table(@join_table_name,
-      ram_copies: [node()],
-      attributes: [:a_id, :b_id],
-      storage_properties: [
-        ets: [:compressed]
-      ],
-      type: :ordered_set
-    )
-
-    :mnesia.wait_for_tables(
-      [
-        @has_many_table_name,
-        @belongs_to_table_name,
-        @many_to_many_a_table_name,
-        @many_to_many_b_table_name,
-        @join_table_name
-      ],
-      1000
-    )
+    [BelongsToSchema, HasManySchema, ManyToManySchemaA, ManyToManySchemaB]
+    |> Enum.each(fn schema ->
+      :ok = Mnesia.Migration.sync_create_table(schema, ram_copies: [node()])
+    end)
   end
 
   test "preload has_many association" do

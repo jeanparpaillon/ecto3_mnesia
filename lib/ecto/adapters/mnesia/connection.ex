@@ -8,17 +8,17 @@ defmodule Ecto.Adapters.Mnesia.Connection do
   @id_seq_table_name :id_seq
 
   def start_link(config) do
-    GenServer.start_link(Connection, [config], name: __MODULE__)
+    Connection
+    |> GenServer.start_link([config], name: __MODULE__)
+    |> case do
+      {:ok, pid} -> {:ok, pid}
+      {:error, {:already_started, pid}} -> {:ok, pid}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   @impl GenServer
   def init(config) do
-    Process.flag(:trap_exit, true)
-    :mnesia.stop()
-    :mnesia.create_schema(config[:nodes] || [node()])
-    :mnesia.start()
-    ensure_id_seq_table(config[:nodes])
-
     {:ok, config}
   end
 
@@ -40,11 +40,11 @@ defmodule Ecto.Adapters.Mnesia.Connection do
     Mnesia.Query.from_ecto_query(type, query)
   end
 
-  defp ensure_id_seq_table(nil) do
+  def ensure_id_seq_table(nil) do
     ensure_id_seq_table([node()])
   end
 
-  defp ensure_id_seq_table(nodes) when is_list(nodes) do
+  def ensure_id_seq_table(nodes) when is_list(nodes) do
     case :mnesia.create_table(@id_seq_table_name,
            disc_copies: nodes,
            attributes: [:id, :_dummy],
