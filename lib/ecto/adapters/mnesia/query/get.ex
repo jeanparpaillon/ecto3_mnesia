@@ -2,8 +2,11 @@ defmodule Ecto.Adapters.Mnesia.Query.Get do
   @moduledoc """
   Query builder for simple `Repo.get` like queries
   """
+  alias Ecto.Adapters.Mnesia.Query
   alias Ecto.Adapters.Mnesia.Source
   alias Ecto.Query.BooleanExpr
+
+  @behaviour Query
 
   def query(_select, _joins, [%Source{table: table}]) do
     fn [%BooleanExpr{
