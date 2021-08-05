@@ -123,10 +123,7 @@ defmodule Ecto.Adapters.Mnesia.Source do
     index =
       attributes
       |> Enum.with_index()
-      |> Enum.reduce(%{}, fn
-        {:__key__, _}, acc -> acc
-        {a, i}, acc -> Map.put(acc, a, i + 1)
-      end)
+      |> Enum.reduce(%{}, fn {a, i}, acc -> Map.put(acc, a, i + 1) end)
 
     %{source | index: index}
   end
