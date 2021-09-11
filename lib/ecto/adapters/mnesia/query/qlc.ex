@@ -218,6 +218,18 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
     {"lists:member(#{erl_var}, #{bind_var})", context}
   end
 
+  defp to_qlc({:fragment, [], fragments}, context) do
+    Enum.reduce(fragments, {"", context}, fn
+      {:raw, raw}, {fragment, context} -> {fragment <> raw, context}
+      {:expr, {{:., [], [{:&, [], [source_index]}, field]}, [], []}}, {fragment, context} ->
+        source = Enum.at(context.sources, source_index)
+        {fragment <> Source.to_erl_var(source, field), context}
+      {:expr, value}, {fragment, context} ->
+        {_value, binding, context} = Context.add_binding(context, value, value)
+        {fragment <> Atom.to_string(binding), context}
+    end)
+  end
+
   defp to_qlc(
          {op, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, {:^, [], [index]}]},
          context

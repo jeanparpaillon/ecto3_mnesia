@@ -689,6 +689,57 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
+    test "#all from one table with basic fragment, records" do
+      records = [
+        %TestSchema{id: 1, field: "field 1"},
+        %TestSchema{id: 2, field: "field 2"}
+      ]
+
+      {:atomic, _result} =
+        :mnesia.transaction(fn ->
+          Enum.map(records, fn %{id: id, field: field} ->
+            :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+          end)
+        end)
+
+      assert [%TestSchema{id: 1, field: "field 1"}] =
+               TestRepo.all(
+                 from(s in TestSchema,
+                   where: fragment("? == ?", s.field, "field 1")
+                 )
+               )
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    test "#all from one table with regex fragment, records" do
+      records = [
+        %TestSchema{id: 1, field: "field 1"},
+        %TestSchema{id: 2, field: "field 2"}
+      ]
+
+      {:atomic, _result} =
+        :mnesia.transaction(fn ->
+          Enum.map(records, fn %{id: id, field: field} ->
+            :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+          end)
+        end)
+
+      assert [%TestSchema{id: 1, field: "field 1"}] =
+               TestRepo.all(
+                 from(s in TestSchema,
+                   where:
+                     fragment(
+                       ~s{case re:run(?, ?) of \{match, Captured\} -> true; nomatch -> false end},
+                       s.field,
+                       "field 1"
+                     )
+                 )
+               )
+
+      :mnesia.clear_table(@table_name)
+    end
+
     test "Repo.get" do
       records = [
         %TestSchema{id: 1, field: "field 1"},

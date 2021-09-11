@@ -13,7 +13,7 @@ Mnesia is Distributed Database Management System shipped with Erlang runtime. Be
 - [x] Simple where queries
 - [x] and/or/in in where clauses
 - [x] Bindings
-- [ ] Fragments
+- [x] Fragments
 - [x] Limit/Offset queries
 - [x] Sort by one field
 - [ ] Sort by multiple fields
