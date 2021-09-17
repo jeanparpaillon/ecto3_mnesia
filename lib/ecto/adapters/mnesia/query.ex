@@ -48,31 +48,15 @@ defmodule Ecto.Adapters.Mnesia.Query do
 
   @spec from_ecto_query(type :: atom(), ecto_query :: Ecto.Query.t()) ::
           mnesia_query :: t()
-  def from_ecto_query(
-        type,
-        %Ecto.Query{
-          sources: sources,
-          updates: updates,
-          wheres: wheres,
-          select: select,
-          joins: joins,
-          order_bys: order_bys,
-          limit: limit,
-          offset: offset
-        } = original
-      ) do
-    sources = sources(sources)
+  def from_ecto_query(type, %Ecto.Query{} = original) do
     impl = select_impl(original)
 
-    %Mnesia.Query{
-      original: original,
-      type: type,
-      sources: sources,
-      query: impl.query(select, joins, sources).(wheres),
-      sort: impl.sort(order_bys, select, sources),
-      answers: impl.answers(limit, offset),
-      new_record: new_record(Enum.at(sources, 0), updates)
-    }
+    %Mnesia.Query{original: original, type: type}
+    |> set_sources()
+    |> set_query(impl)
+    |> set_sort(impl)
+    |> set_answers(impl)
+    |> set_new_record()
   end
 
   @doc false
@@ -85,6 +69,26 @@ defmodule Ecto.Adapters.Mnesia.Query do
       %{single_pkey?: true, join_query?: false, pk_query?: true} -> Query.Get
       _ -> Query.Qlc
     end
+  end
+
+  defp set_sources(%__MODULE__{original: original} = q) do
+    %{q | sources: sources(original.sources)}
+  end
+
+  defp set_query(%__MODULE__{original: original, sources: sources} = q, impl) do
+    %{q | query: impl.query(original.select, original.joins, sources).(original.wheres)}
+  end
+
+  defp set_sort(%__MODULE__{original: original, sources: sources} = q, impl) do
+    %{q | sort: impl.sort(original.order_bys, original.select, sources)}
+  end
+
+  defp set_answers(%__MODULE__{original: original} = q, impl) do
+    %{q | answers: impl.answers(original.limit, original.offset)}
+  end
+
+  defp set_new_record(%__MODULE__{original: original, sources: sources} = q) do
+    %{q | new_record: new_record(Enum.at(sources, 0), original.updates)}
   end
 
   defp single_pkey?(acc, %Ecto.Query{sources: {source}}) do
