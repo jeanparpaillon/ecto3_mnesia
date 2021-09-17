@@ -41,7 +41,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
   end
 
   @callback query(select :: term(), joins :: term(), sources :: term()) ::
-              (params :: term() -> term())
+              {:cache | :nocache, (params :: term() -> term())}
   @callback sort(order_bys :: term(), select :: term(), sources :: term()) :: (term() -> term())
   @callback answers(limit :: term(), offset :: term()) ::
               (term(), context :: term() -> Enumerable.t())
@@ -76,7 +76,9 @@ defmodule Ecto.Adapters.Mnesia.Query do
   end
 
   defp set_query(%__MODULE__{original: original, sources: sources} = q, impl) do
-    %{q | query: impl.query(original.select, original.joins, sources).(original.wheres)}
+    {cache, prepared} = impl.query(original.select, original.joins, sources)
+    query = prepared.(original.wheres)
+    %{q | query: query, cache: cache}
   end
 
   defp set_sort(%__MODULE__{original: original, sources: sources} = q, impl) do

@@ -369,7 +369,8 @@ defmodule Ecto.Adapters.Mnesia do
   def update(_adapter_meta, schema_meta, params, filters, returning, _opts) do
     source = Source.new(schema_meta)
     answers_context = [params: params]
-    query = Mnesia.Query.Qlc.query(:all, [], [source]).(filters)
+    {_cache, prepared} = Mnesia.Query.Qlc.query(:all, [], [source])
+    query = prepared.(filters)
 
     with {selectTime, {:atomic, [attributes]}} <-
            tc_tx(fn -> query.(params) |> Mnesia.Query.Qlc.answers(nil, nil).(answers_context) end),
@@ -402,7 +403,8 @@ defmodule Ecto.Adapters.Mnesia do
   @impl Ecto.Adapter.Schema
   def delete(_adapter_meta, schema_meta, filters, _opts) do
     source = Source.new(schema_meta)
-    query = Mnesia.Query.Qlc.query(:all, [], [source]).(filters)
+    {_cache, prepared} = Mnesia.Query.Qlc.query(:all, [], [source])
+    query = prepared.(filters)
 
     with {selectTime, {:atomic, [[id | _t]]}} <-
            tc_tx(fn ->

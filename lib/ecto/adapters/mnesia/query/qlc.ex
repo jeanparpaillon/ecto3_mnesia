@@ -18,19 +18,17 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
     desc: :descending
   }
 
-  @spec query(%SelectExpr{} | :all, any(), [Source.t()]) ::
-          (list() -> (params :: list() -> query_handle :: :qlc.query_handle()))
   def query(select, joins, sources) do
     context = Context.new(sources)
 
-    fn
+    q = fn
       [%BooleanExpr{}] = wheres -> build_query(select, joins, wheres, context)
       filters -> build_query(select, joins, filters, context)
     end
+
+    {:nocache, q}
   end
 
-  @spec sort(list(%QueryExpr{}), %SelectExpr{}, list(tuple())) ::
-          (query_handle :: :qlc.query_handle() -> query_handle :: :qlc.query_handle())
   def sort([], _select, _sources) do
     fn query -> query end
   end
