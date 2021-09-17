@@ -141,130 +141,20 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   @impl Ecto.Adapter.Queryable
-  def execute(
-        _adapter_meta,
-        _query_meta,
-        {:nocache,
-         %Mnesia.Query{
-           type: :all,
-           sources: sources,
-           query: query,
-           sort: sort,
-           answers: answers
-         }},
-        params,
-        _opts
-      ) do
-    context = [params: params]
-
-    case tc_tx(fn ->
-           query.(params)
-           |> sort.()
-           |> answers.(context)
-           |> Enum.map(&Tuple.to_list(&1))
-         end) do
-      {time, {:atomic, result}} ->
-        Logger.debug("QUERY OK sources=#{inspect(sources)} type=all db=#{time}µs")
-
-        {length(result), result}
-
-      {time, {:aborted, error}} ->
-        Logger.debug(
-          "QUERY ERROR sources=#{inspect(sources)} type=all db=#{time}µs #{inspect(error)}"
-        )
-
-        {0, []}
-    end
+  def execute(adapter_meta, _query_meta, {:cache, update, prepared}, params, _opts) do
+    {:ok, result} = mnesia_call(adapter_meta, prepared, params)
+    update.(prepared)
+    result
   end
 
-  def execute(
-        _adapter_meta,
-        _query_meta,
-        {:nocache,
-         %Mnesia.Query{
-           type: :update_all,
-           sources: [%Source{} = source | _] = sources,
-           query: query,
-           answers: answers,
-           new_record: new_record
-         }},
-        params,
-        _opts
-      ) do
-    answers_context = [params: params]
-
-    case tc_tx(fn ->
-           query.(params)
-           |> answers.(answers_context)
-           |> Enum.map(&new_record.(&1, params))
-           |> Enum.map(fn record ->
-             with :ok <- :mnesia.write(source.table, record, :write) do
-               Record.to_schema(record, source)
-             end
-           end)
-         end) do
-      {time, {:atomic, result}} ->
-        Logger.debug(
-          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{time}µs"
-        )
-
-        {length(result), result}
-
-      {time, {:aborted, error}} ->
-        Logger.debug(
-          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{time}µs #{inspect(error)}"
-        )
-
-        {0, nil}
-    end
+  def execute(adapter_meta, _query_meta, {:cached, _update, _reset, cached}, params, _opts) do
+    {:ok, result} = mnesia_call(adapter_meta, cached, params)
+    result
   end
 
-  def execute(
-        _adapter_meta,
-        _query_meta,
-        {:nocache,
-         %Mnesia.Query{
-           original: original,
-           type: :delete_all,
-           sources: [%Source{} = source | _] = sources,
-           query: query,
-           answers: answers
-         }},
-        params,
-        _opts
-      ) do
-    context = [params: params]
-
-    case tc_tx(fn ->
-           query.(params)
-           |> answers.(context)
-           |> Enum.map(fn tuple ->
-             # Works only if query selects id at first, see: https://gitlab.com/patatoid/ecto3_mnesia/-/issues/15
-             id = elem(tuple, 0)
-             :mnesia.delete(source.table, id, :write)
-             Tuple.to_list(tuple)
-           end)
-         end) do
-      {time, {:atomic, records}} ->
-        Logger.debug(
-          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{time}µs"
-        )
-
-        result =
-          case original.select do
-            nil -> nil
-            %Ecto.Query.SelectExpr{} -> records
-          end
-
-        {length(records), result}
-
-      {time, {:aborted, error}} ->
-        Logger.debug(
-          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{time}µs #{inspect(error)}"
-        )
-
-        {0, nil}
-    end
+  def execute(adapter_meta, _query_meta, {:nocache, prepared}, params, _opts) do
+    {:ok, result} = mnesia_call(adapter_meta, prepared, params)
+    result
   end
 
   @impl Ecto.Adapter.Queryable
@@ -332,37 +222,6 @@ defmodule Ecto.Adapters.Mnesia do
     @impl Ecto.Adapter.Schema
     def insert_all(adapter_meta, schema, header, records, on_conflict, returning, opts),
       do: do_insert_all(adapter_meta, schema, header, records, on_conflict, returning, opts)
-  end
-
-  defp do_insert_all(adapter_meta, schema_meta, _header, records, on_conflict, returning, _opts) do
-    source = Source.new(schema_meta)
-
-    case tc_tx(fn ->
-           Enum.map(records, fn params ->
-             upsert(source, params, on_conflict, adapter_meta)
-           end)
-         end) do
-      {time, {:atomic, created_records}} ->
-        result =
-          Enum.map(created_records, fn [record] ->
-            record
-            |> Record.select(returning, source)
-            |> Enum.map(&elem(&1, 1))
-          end)
-
-        Logger.debug(
-          "QUERY OK source=#{inspect(schema_meta.source)} type=insert_all db=#{time}µs"
-        )
-
-        {length(result), result}
-
-      {time, {:aborted, {:invalid, constraints}}} ->
-        Logger.debug(
-          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert_all db=#{time}µs #{inspect(constraints)}"
-        )
-
-        {0, nil}
-    end
   end
 
   @impl Ecto.Adapter.Schema
@@ -503,6 +362,157 @@ defmodule Ecto.Adapters.Mnesia do
     case File.exists?(path) do
       true -> :up
       false -> :down
+    end
+  end
+
+  ###
+  ### Priv
+  ###
+  defp do_insert_all(adapter_meta, schema_meta, _header, records, on_conflict, returning, _opts) do
+    source = Source.new(schema_meta)
+
+    case tc_tx(fn ->
+           Enum.map(records, fn params ->
+             upsert(source, params, on_conflict, adapter_meta)
+           end)
+         end) do
+      {time, {:atomic, created_records}} ->
+        result =
+          Enum.map(created_records, fn [record] ->
+            record
+            |> Record.select(returning, source)
+            |> Enum.map(&elem(&1, 1))
+          end)
+
+        Logger.debug(
+          "QUERY OK source=#{inspect(schema_meta.source)} type=insert_all db=#{time}µs"
+        )
+
+        {length(result), result}
+
+      {time, {:aborted, {:invalid, constraints}}} ->
+        Logger.debug(
+          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert_all db=#{time}µs #{inspect(constraints)}"
+        )
+
+        {0, nil}
+    end
+  end
+
+  defp mnesia_call(
+         _adapter_meta,
+         %Mnesia.Query{
+           type: :all,
+           sources: sources,
+           query: query,
+           sort: sort,
+           answers: answers
+         },
+         params
+       ) do
+    context = [params: params]
+
+    case tc_tx(fn ->
+           query.(params)
+           |> sort.()
+           |> answers.(context)
+           |> Enum.map(&Tuple.to_list(&1))
+         end) do
+      {time, {:atomic, result}} ->
+        Logger.debug("QUERY OK sources=#{inspect(sources)} type=all db=#{time}µs")
+
+        {:ok, {length(result), result}}
+
+      {time, {:aborted, error}} ->
+        Logger.debug(
+          "QUERY ERROR sources=#{inspect(sources)} type=all db=#{time}µs #{inspect(error)}"
+        )
+
+        {:ok, {0, []}}
+    end
+  end
+
+  defp mnesia_call(
+         _adapter_meta,
+         %Mnesia.Query{
+           type: :update_all,
+           sources: [%Source{} = source | _] = sources,
+           query: query,
+           answers: answers,
+           new_record: new_record
+         },
+         params
+       ) do
+    answers_context = [params: params]
+
+    case tc_tx(fn ->
+           query.(params)
+           |> answers.(answers_context)
+           |> Enum.map(&new_record.(&1, params))
+           |> Enum.map(fn record ->
+             with :ok <- :mnesia.write(source.table, record, :write) do
+               Record.to_schema(record, source)
+             end
+           end)
+         end) do
+      {time, {:atomic, result}} ->
+        Logger.debug(
+          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{time}µs"
+        )
+
+        {:ok, {length(result), result}}
+
+      {time, {:aborted, error}} ->
+        Logger.debug(
+          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{time}µs #{inspect(error)}"
+        )
+
+        {:ok, {0, nil}}
+    end
+  end
+
+  defp mnesia_call(
+         _adapter_meta,
+         %Mnesia.Query{
+           original: original,
+           type: :delete_all,
+           sources: [%Source{} = source | _] = sources,
+           query: query,
+           answers: answers
+         },
+         params
+       ) do
+    context = [params: params]
+
+    case tc_tx(fn ->
+           query.(params)
+           |> answers.(context)
+           |> Enum.map(fn tuple ->
+             # Works only if query selects id at first, see: https://gitlab.com/patatoid/ecto3_mnesia/-/issues/15
+             id = elem(tuple, 0)
+             :mnesia.delete(source.table, id, :write)
+             Tuple.to_list(tuple)
+           end)
+         end) do
+      {time, {:atomic, records}} ->
+        Logger.debug(
+          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{time}µs"
+        )
+
+        result =
+          case original.select do
+            nil -> nil
+            %Ecto.Query.SelectExpr{} -> records
+          end
+
+        {:ok, {length(records), result}}
+
+      {time, {:aborted, error}} ->
+        Logger.debug(
+          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{time}µs #{inspect(error)}"
+        )
+
+        {:ok, {0, nil}}
     end
   end
 

@@ -51,7 +51,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
   def from_ecto_query(type, %Ecto.Query{} = original) do
     impl = select_impl(original)
 
-    %Mnesia.Query{original: original, type: type}
+    %Mnesia.Query{original: original, type: type, cache: :cache}
     |> set_sources()
     |> set_query(impl)
     |> set_sort(impl)
