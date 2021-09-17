@@ -2,8 +2,6 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   @moduledoc """
   Builds qlc query out of Ecto.Query
   """
-  require Qlc
-
   alias Ecto.Adapters.Mnesia.Query
   alias Ecto.Adapters.Mnesia.Query.Qlc.Context
   alias Ecto.Adapters.Mnesia.Source
@@ -79,7 +77,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
         |> Enum.reject(fn component -> String.length(component) == 0 end)
         |> Enum.join(", ")
 
-      Qlc.q("[#{comprehension}]", context.bindings)
+      :qlc.string_to_handle('[#{comprehension}].', [], Qlc.bind(context.bindings))
     end
   end
 
