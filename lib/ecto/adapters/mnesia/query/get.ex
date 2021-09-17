@@ -22,7 +22,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Get do
       end
     end
 
-    {:nocache, q}
+    {:cache, q}
   end
 
   def sort(_orders_by, _select, _sources) do
