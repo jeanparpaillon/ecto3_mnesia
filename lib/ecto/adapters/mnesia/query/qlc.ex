@@ -2,8 +2,6 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   @moduledoc """
   Builds qlc query out of Ecto.Query
   """
-  require Qlc
-
   alias Ecto.Adapters.Mnesia.Query
   alias Ecto.Adapters.Mnesia.Query.Qlc.Context
   alias Ecto.Adapters.Mnesia.Source
@@ -18,19 +16,17 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
     desc: :descending
   }
 
-  @spec query(%SelectExpr{} | :all, any(), [Source.t()]) ::
-          (list() -> (params :: list() -> query_handle :: :qlc.query_handle()))
   def query(select, joins, sources) do
     context = Context.new(sources)
 
-    fn
+    q = fn
       [%BooleanExpr{}] = wheres -> build_query(select, joins, wheres, context)
       filters -> build_query(select, joins, filters, context)
     end
+
+    {:nocache, q}
   end
 
-  @spec sort(list(%QueryExpr{}), %SelectExpr{}, list(tuple())) ::
-          (query_handle :: :qlc.query_handle() -> query_handle :: :qlc.query_handle())
   def sort([], _select, _sources) do
     fn query -> query end
   end
@@ -81,7 +77,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
         |> Enum.reject(fn component -> String.length(component) == 0 end)
         |> Enum.join(", ")
 
-      Qlc.q("[#{comprehension}]", context.bindings)
+      :qlc.string_to_handle('[#{comprehension}].', [], Qlc.bind(context.bindings))
     end
   end
 

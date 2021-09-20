@@ -21,7 +21,8 @@ defmodule Ecto.Adapters.Mnesia.Query do
             query: nil,
             sort: nil,
             answers: nil,
-            new_record: nil
+            new_record: nil,
+            cache: :nocache
 
   @type t :: %__MODULE__{
           original: Ecto.Query.t(),
@@ -30,47 +31,32 @@ defmodule Ecto.Adapters.Mnesia.Query do
           query: (params :: list() -> query_handle :: :qlc.query_handle()),
           sort: (query_handle :: :qlc.query_handle() -> query_handle :: :qlc.query_handle()),
           answers: (query_handle :: :qlc.query_handle(), context :: Keyword.t() -> list(tuple())),
-          new_record: (tuple(), list() -> tuple())
+          new_record: (tuple(), list() -> tuple()),
+          cache: :nocache | :cache
         }
 
-        defmodule ImplSelector do
-          @moduledoc false
-          defstruct single_pkey?: false, join_query?: false, pk_query?: false, pk: nil
-        end
+  defmodule ImplSelector do
+    @moduledoc false
+    defstruct single_pkey?: false, join_query?: false, pk_query?: false, pk: nil
+  end
 
   @callback query(select :: term(), joins :: term(), sources :: term()) ::
-              (params :: term() -> term())
+              {:cache | :nocache, (params :: term() -> term())}
   @callback sort(order_bys :: term(), select :: term(), sources :: term()) :: (term() -> term())
   @callback answers(limit :: term(), offset :: term()) ::
               (term(), context :: term() -> Enumerable.t())
 
   @spec from_ecto_query(type :: atom(), ecto_query :: Ecto.Query.t()) ::
           mnesia_query :: t()
-  def from_ecto_query(
-        type,
-        %Ecto.Query{
-          sources: sources,
-          updates: updates,
-          wheres: wheres,
-          select: select,
-          joins: joins,
-          order_bys: order_bys,
-          limit: limit,
-          offset: offset
-        } = original
-      ) do
-    sources = sources(sources)
+  def from_ecto_query(type, %Ecto.Query{} = original) do
     impl = select_impl(original)
 
-    %Mnesia.Query{
-      original: original,
-      type: type,
-      sources: sources,
-      query: impl.query(select, joins, sources).(wheres),
-      sort: impl.sort(order_bys, select, sources),
-      answers: impl.answers(limit, offset),
-      new_record: new_record(Enum.at(sources, 0), updates)
-    }
+    %Mnesia.Query{original: original, type: type, cache: :cache}
+    |> set_sources()
+    |> set_query(impl)
+    |> set_sort(impl)
+    |> set_answers(impl)
+    |> set_new_record()
   end
 
   @doc false
@@ -83,6 +69,28 @@ defmodule Ecto.Adapters.Mnesia.Query do
       %{single_pkey?: true, join_query?: false, pk_query?: true} -> Query.Get
       _ -> Query.Qlc
     end
+  end
+
+  defp set_sources(%__MODULE__{original: original} = q) do
+    %{q | sources: sources(original.sources)}
+  end
+
+  defp set_query(%__MODULE__{original: original, sources: sources} = q, impl) do
+    {cache, prepared} = impl.query(original.select, original.joins, sources)
+    query = prepared.(original.wheres)
+    %{q | query: query, cache: cache}
+  end
+
+  defp set_sort(%__MODULE__{original: original, sources: sources} = q, impl) do
+    %{q | sort: impl.sort(original.order_bys, original.select, sources)}
+  end
+
+  defp set_answers(%__MODULE__{original: original} = q, impl) do
+    %{q | answers: impl.answers(original.limit, original.offset)}
+  end
+
+  defp set_new_record(%__MODULE__{original: original, sources: sources} = q) do
+    %{q | new_record: new_record(Enum.at(sources, 0), original.updates)}
   end
 
   defp single_pkey?(acc, %Ecto.Query{sources: {source}}) do
@@ -102,7 +110,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
       {{:., [type: :id], _}, [], []} -> true
       _ -> false
     end)
-    |> (& %{acc | join_query?: &1}).()
+    |> (&%{acc | join_query?: &1}).()
   end
 
   defp join_query?(acc, _), do: %{acc | join_query?: false}
