@@ -28,6 +28,7 @@ end
 defmodule BenchUtils do
   def setup do
     Mnesia.ensure_all_started([], :permanent)
+    Ecto.Adapters.Mnesia.storage_up([])
     {:ok, _repo} = BenchRepo.start_link()
     :mnesia.create_table(:test_table,
       disc_copies: [node()],

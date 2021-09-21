@@ -40,3 +40,6 @@ tags
 **/\#*
 **/*~
 Mnesia*
+
+# Benchmark output
+/benchmarks/output

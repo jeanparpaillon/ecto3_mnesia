@@ -20,7 +20,8 @@ defmodule EctoMnesia.MixProject do
         extras: ["README.md"]
       ],
       elixirc_paths: elixirc_paths(Mix.env()),
-      consolidate_protocols: Mix.env() != :test
+      consolidate_protocols: Mix.env() != :test,
+      aliases: aliases()
     ]
   end
 
@@ -61,5 +62,11 @@ defmodule EctoMnesia.MixProject do
     """
     Mnesia adapter for Ecto 3
     """
+  end
+
+  defp aliases do
+    [
+      benchmark: "run benchmarks/get.exs"
+    ]
   end
 end
