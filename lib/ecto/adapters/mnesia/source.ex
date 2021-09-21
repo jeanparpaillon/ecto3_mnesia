@@ -1,5 +1,6 @@
 defmodule Ecto.Adapters.Mnesia.Source do
   @moduledoc false
+
   defstruct table: nil,
             schema: nil,
             loaded: nil,
@@ -32,7 +33,7 @@ defmodule Ecto.Adapters.Mnesia.Source do
       record_name: record_name,
       loaded: loaded,
       autogenerate_id: meta[:autogenerate_id],
-      schema_erl_prefix: schema |> to_string() |> String.replace(".", "_")
+      schema_erl_prefix: "V" <> to_string(schema)
     }
     |> build_extra_key(keys)
     |> build_attributes()
@@ -72,18 +73,12 @@ defmodule Ecto.Adapters.Mnesia.Source do
 
   @doc false
   def qlc_attributes_pattern(source) do
-    source.attributes
-    |> Enum.map(fn attribute -> to_erl_var(source, attribute) end)
-  end
-
-  @doc false
-  def qlc_record_pattern(%{schema_erl_prefix: prefix} = source) do
-    [prefix | qlc_attributes_pattern(source)]
+    Enum.map(source.attributes, &{:var, 1, to_erl_var(source, &1)})
   end
 
   @doc false
   def to_erl_var(%{schema_erl_prefix: prefix}, attribute) do
-    prefix <> "_" <> (attribute |> to_string() |> String.capitalize())
+    String.to_atom(prefix <> "_" <> to_string(attribute))
   end
 
   ###
