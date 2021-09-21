@@ -10,7 +10,8 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   alias Ecto.Query.SelectExpr
 
   @behaviour Query
-  @dialyzer {:nowarn_function, to_query_handle: 2}
+  @dialyzer {:no_return, [build_query: 4, to_query_handle: 2]}
+  @dialyzer :no_opaque
 
   @order_mapping %{
     asc: :ascending,
