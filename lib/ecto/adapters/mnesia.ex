@@ -226,7 +226,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def update(_adapter_meta, schema_meta, params, filters, returning, _opts) do
-    source = Source.new(schema_meta)
+    source = Connection.source(schema_meta)
     answers_context = [params: params]
     {_cache, prepared} = Mnesia.Query.Qlc.query(:all, [], [source])
     query = prepared.(filters)
@@ -261,7 +261,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def delete(_adapter_meta, schema_meta, filters, _opts) do
-    source = Source.new(schema_meta)
+    source = Connection.source(schema_meta)
     {_cache, prepared} = Mnesia.Query.Qlc.query(:all, [], [source])
     query = prepared.(filters)
 

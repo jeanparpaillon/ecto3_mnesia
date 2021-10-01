@@ -5,8 +5,10 @@ defmodule Ecto.Adapters.Mnesia.Connection do
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Constraint
+  alias Ecto.Adapters.Mnesia.Source
 
   @id_seq_table_name :mnesia_id_seq
+  @sources_tid Module.concat([__MODULE__, :Sources])
 
   def start_link(config) do
     Connection
@@ -18,9 +20,19 @@ defmodule Ecto.Adapters.Mnesia.Connection do
     end
   end
 
+  def source(schema),
+    do: GenServer.call(__MODULE__, {:source, schema})
+
   @impl GenServer
   def init(config) do
-    {:ok, config}
+    sources = :ets.new(@sources_tid, [])
+    {:ok, %{config: config, sources: sources}}
+  end
+
+  @impl GenServer
+  def handle_call({:source, schema}, _from, s) do
+    source = Source.new(schema)
+    {:reply, source, s}
   end
 
   @impl GenServer
