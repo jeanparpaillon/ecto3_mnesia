@@ -86,14 +86,19 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
 
     fn params ->
       context =
-        %{context | params: params}
+        context
         |> qualifiers(filters)
         |> joins(joins)
 
       expr = {:lc, 1, vars, generators ++ context.joins ++ context.qualifiers}
 
-      {:ok, {:call, _, _, handle}} = :qlc_pt.transform_expression(expr, context.bindings)
-      {:value, qlc_lc, _} = :erl_eval.exprs(handle, context.bindings)
+      bindings =
+        Context.bindings(context)
+        |> Enum.zip(params)
+        |> Kernel.++(Context.extra_bindings(context))
+
+      {:ok, {:call, _, _, handle}} = :qlc_pt.transform_expression(expr, bindings)
+      {:value, qlc_lc, _} = :erl_eval.exprs(handle, bindings)
       :qlc.q(qlc_lc, [])
     end
   end
@@ -192,8 +197,9 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   defp to_qlc(true, context), do: {{:atom, 1, true}, context}
 
   defp to_qlc({field, value}, %{sources: [source]} = context) do
-    {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, value)
-    {{:op, 1, :==, {:var, 1, erl_var}, {:var, 1, bind_var}}, context}
+    erl_var = Source.to_erl_var(source, field)
+    {var, context} = Context.extra_binding(context, value)
+    {{:op, 1, :==, {:var, 1, erl_var}, {:var, 1, var}}, context}
   end
 
   defp to_qlc(
@@ -218,8 +224,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
          {:is_nil, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}]},
          context
        ) do
-    source = Enum.at(context.sources, source_index)
-    erl_var = Source.to_erl_var(source, field)
+    erl_var = Context.source_var(context, source_index, field)
     {{:op, 1, :==, {:var, 1, erl_var}, {:atom, 1, nil}}, context}
   end
 
@@ -233,8 +238,14 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
           [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, {:^, [], [index, length]}]},
          context
        ) do
-    values = Enum.slice(context.params, index, length)
-    to_qlc({:in, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, values]}, context)
+    erl_var = Context.source_var(context, source_index, field)
+    {binding_vars, context} = Enum.reduce((index + (length-1))..index, {{nil, 1}, context}, fn i, {acc, context} ->
+      {var, context} = Context.binding_var(context, i)
+      {{:cons, 1, {:var, 1, var}, acc}, context}
+    end)
+
+    {{:call, 1, {:remote, 1, {:atom, 1, :lists}, {:atom, 1, :member}},
+      [{:var, 1, erl_var}, binding_vars]}, context}
   end
 
   defp to_qlc(
@@ -242,43 +253,42 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
          context
        )
        when is_list(values) do
-    source = Enum.at(context.sources, source_index)
-    {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, values)
+    erl_var = Context.source_var(context, source_index, field)
+    {var, context} = Context.extra_binding(context, values)
 
     {{:call, 1, {:remote, 1, {:atom, 1, :lists}, {:atom, 1, :member}},
-      [{:var, 1, erl_var}, {:var, 1, bind_var}]}, context}
+      [{:var, 1, erl_var}, {:var, 1, var}]}, context}
   end
 
   defp to_qlc(
          {op, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, {:^, [], [index]}]},
          context
        ) do
-    value = Enum.at(context.params, index)
-    to_qlc({op, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, value]}, context)
+    erl_var = Context.source_var(context, source_index, field)
+    {var, context} = Context.binding_var(context, index)
+    {{:op, 1, to_qlc_op(op), {:var, 1, erl_var}, {:var, 1, var}}, context}
   end
 
   defp to_qlc(
          {op, [],
           [
-            {{:., [], [{:&, [], [key_source_index]}, key_field]}, [], []},
-            {{:., [], [{:&, [], [value_source_index]}, value_field]}, [], []}
+            {{:., [], [{:&, [], [left_source_index]}, left_field]}, [], []},
+            {{:., [], [{:&, [], [right_source_index]}, right_field]}, [], []}
           ]},
          context
        ) do
-    key_source = Enum.at(context.sources, key_source_index)
-    value_source = Enum.at(context.sources, value_source_index)
-    erl_var = Source.to_erl_var(key_source, key_field)
-    value = Source.to_erl_var(value_source, value_field)
-    {{:op, 1, to_qlc_op(op), {:var, 1, erl_var}, {:var, 1, value}}, context}
+    left_erl_var = Context.source_var(context, left_source_index, left_field)
+    right_erl_var = Context.source_var(context, right_source_index, right_field)
+    {{:op, 1, to_qlc_op(op), {:var, 1, left_erl_var}, {:var, 1, right_erl_var}}, context}
   end
 
   defp to_qlc(
          {op, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, value]},
          context
        ) do
-    source = Enum.at(context.sources, source_index)
-    {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, value)
-    {{:op, 1, to_qlc_op(op), {:var, 1, erl_var}, {:var, 1, bind_var}}, context}
+    erl_var = Context.source_var(context, source_index,field)
+    {var, context} = Context.extra_binding(context, value)
+    {{:op, 1, to_qlc_op(op), {:var, 1, erl_var}, {:var, 1, var}}, context}
   end
 
   defp to_qlc_op(:!=), do: :"=/="
