@@ -38,7 +38,6 @@ defmodule EctoMnesia.MixProject do
   defp deps do
     [
       {:ecto, "~> 3.0"},
-      {:qlc, "~> 1.0"},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false},
       # Benchmarks
@@ -66,7 +65,8 @@ defmodule EctoMnesia.MixProject do
 
   defp aliases do
     [
-      benchmark: "run benchmarks/get.exs"
+      benchmark: "run benchmarks/get.exs",
+      profile: "run benchmarks/prof.exs"
     ]
   end
 end

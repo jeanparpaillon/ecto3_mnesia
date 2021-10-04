@@ -42,7 +42,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
           Enum.reduce(expr, query1, fn {order, field_expr}, query2 ->
             field = field(field_expr, context)
             field_index = Enum.find_index(fields(select, context), fn e -> e == field end)
-            Qlc.keysort(query2, field_index, order: @order_mapping[order])
+            :qlc.keysort(field_index + 1, query2, order: @order_mapping[order])
           end)
       end)
     end
@@ -54,13 +54,13 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
     fn query, context ->
       limit = unbind_limit(limit, context)
       offset = unbind_offset(offset, context)
-      cursor = Qlc.cursor(query)
+      cursor = :qlc.cursor(query)
 
       if offset > 0 do
-        :qlc.next_answers(cursor.c, offset)
+        :qlc.next_answers(cursor, offset)
       end
 
-      :qlc.next_answers(cursor.c, limit)
+      :qlc.next_answers(cursor, limit)
       |> :qlc.e()
     end
   end
