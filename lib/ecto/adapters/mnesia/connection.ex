@@ -30,8 +30,19 @@ defmodule Ecto.Adapters.Mnesia.Connection do
   end
 
   @impl GenServer
-  def handle_call({:source, schema}, _from, s) do
-    source = Source.new(schema)
+  def handle_call({:source, params}, _from, s) do
+    key =
+      case params do
+        {_table, _schema, _prefix} = key -> key
+        %{schema: schema, source: table, prefix: prefix} -> {table, schema, prefix}
+      end
+
+    source =
+      case :ets.lookup(s.sources, key) do
+        [] -> Source.new(key, :query)
+        [source] -> source
+      end
+
     {:reply, source, s}
   end
 

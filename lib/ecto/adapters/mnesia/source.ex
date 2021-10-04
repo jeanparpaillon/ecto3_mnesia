@@ -12,15 +12,23 @@ defmodule Ecto.Adapters.Mnesia.Source do
             schema_erl_prefix: nil,
             record_name: nil,
             attributes: [],
-            extra_key: nil
+            extra_key: nil,
+            erl_vars: %{}
 
   @type t :: %__MODULE__{}
 
-  def new({table, schema, _prefix}) do
-    new(%{source: table, schema: schema})
+  @doc """
+  Returns source structure
+
+  If type is `:query`, some additional fields are be pre-computed for query
+  """
+  def new(params, type \\ :insert)
+
+  def new({table, schema, _prefix}, type) do
+    new(%{source: table, schema: schema}, type)
   end
 
-  def new(%{source: table, schema: schema} = meta) do
+  def new(%{source: table, schema: schema} = meta, type) do
     table = String.to_atom(table)
     schema = schema
     record_name = record_name(schema)
@@ -32,8 +40,7 @@ defmodule Ecto.Adapters.Mnesia.Source do
       schema: schema,
       record_name: record_name,
       loaded: loaded,
-      autogenerate_id: meta[:autogenerate_id],
-      schema_erl_prefix: "V" <> to_string(schema)
+      autogenerate_id: meta[:autogenerate_id]
     }
     |> build_extra_key(keys)
     |> build_attributes()
@@ -41,10 +48,11 @@ defmodule Ecto.Adapters.Mnesia.Source do
     |> build_default()
     |> build_match_all()
     |> build_source_field()
+    |> build_query_optims(type)
   end
 
-  def new(%{schema: schema} = meta) do
-    new(Map.put(meta, :source, schema.__schema__(:source)))
+  def new(%{schema: schema} = meta, type) do
+    new(Map.put(meta, :source, schema.__schema__(:source)), type)
   end
 
   @doc false
@@ -72,18 +80,34 @@ defmodule Ecto.Adapters.Mnesia.Source do
   end
 
   @doc false
-  def qlc_attributes_pattern(source) do
-    Enum.map(source.attributes, &{:var, 1, to_erl_var(source, &1)})
+  def qlc_attributes_pattern(%{erl_vars: erl_vars} = source) do
+    Enum.map(source.attributes, &{:var, 1, erl_vars[&1]})
   end
 
   @doc false
-  def to_erl_var(%{schema_erl_prefix: prefix}, attribute) do
-    String.to_atom(prefix <> "_" <> to_string(attribute))
+  def to_erl_var(%{erl_vars: erl_vars} = source, attribute) do
+    Map.get_lazy(erl_vars, attribute, fn ->
+      String.to_atom(source.schema_erl_prefix <> "_" <> to_string(attribute))
+    end)
   end
 
   ###
   ### Priv
   ###
+  defp build_query_optims(%{schema: schema, attributes: attributes} = source, :query) do
+    {p, refix} = schema |> to_string() |> String.split_at(1)
+    prefix = String.capitalize(p) <> refix
+
+    erl_vars =
+      Enum.reduce(attributes, %{}, fn attr, acc ->
+        Map.put(acc, attr, String.to_atom(prefix <> "_" <> to_string(attr)))
+      end)
+
+    %{source | schema_erl_prefix: prefix, erl_vars: erl_vars}
+  end
+
+  defp build_query_optims(source, _), do: source
+
   defp record_name(schema) do
     if function_exported?(schema, :__record_name__, 0) do
       apply(schema, :__record_name__, [])
