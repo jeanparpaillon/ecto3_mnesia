@@ -77,6 +77,8 @@ defmodule BenchUtils do
   end
 end
 
+Logger.configure(level: :info)
+
 BenchUtils.setup()
 BenchUtils.provision()
 # Just for debugging
