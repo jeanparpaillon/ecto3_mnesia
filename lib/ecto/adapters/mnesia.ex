@@ -83,6 +83,9 @@ defmodule Ecto.Adapters.Mnesia do
   end
   ```
   """
+
+  # @dialyzer :no_return
+
   @behaviour Ecto.Adapter
   @behaviour Ecto.Adapter.Queryable
   @behaviour Ecto.Adapter.Schema
@@ -230,10 +233,26 @@ defmodule Ecto.Adapters.Mnesia do
     {_cache, prepared} = Mnesia.Query.Qlc.query(:all, [], [source])
     query = prepared.(filters)
 
+    select_fun = fn ->
+      try do
+        query.(params) |> Mnesia.Query.Qlc.answers(nil, nil).(params) |> Enum.to_list()
+      rescue
+        _ ->
+          {:atomic, []}
+      end
+    end
+
     with {selectTime, {:atomic, [attributes]}} <-
-           tc_tx(fn -> query.(params) |> Mnesia.Query.Qlc.answers(nil, nil).(params) |> Enum.to_list() end),
+           tc_tx(select_fun),
          {updateTime, {:atomic, update}} <-
-           tc_tx(fn -> do_update(attributes, params, source) end) do
+           tc_tx(fn ->
+             try do
+               do_update(attributes, params, source)
+             rescue
+               _ ->
+                 {:atomic, nil}
+             end
+           end) do
       result = Record.select(update, returning, source)
 
       Logger.debug(
@@ -264,12 +283,18 @@ defmodule Ecto.Adapters.Mnesia do
     {_cache, prepared} = Mnesia.Query.Qlc.query(:all, [], [source])
     query = prepared.(filters)
 
+    select_fun = fn ->
+      try do
+      Mnesia.Query.Qlc.answers(nil, nil).(query.([]), [])
+      |> Enum.map(&Tuple.to_list(&1))
+      rescue
+        _ ->
+          {:atomic, []}
+        end
+    end
+
     with {selectTime, {:atomic, [[id | _t]]}} <-
-           tc_tx(fn ->
-             query.([])
-             |> Mnesia.Query.Qlc.answers(nil, nil).([])
-             |> Enum.map(&Tuple.to_list(&1))
-           end),
+           tc_tx(select_fun),
          {deleteTime, {:atomic, :ok}} <-
            tc_tx(fn ->
              :mnesia.delete(source.table, id, :write)

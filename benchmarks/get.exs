@@ -84,8 +84,7 @@ BenchUtils.provision()
 # Just for debugging
 # BenchUtils.traverse_table_and_show(:test_table)
 
-range = 1..1000
-indexes = range |> Enum.map(fn _ -> Enum.random(range) end)
+indexes = 1..1000 |> Enum.shuffle()
 
 # Hack to get record translation added to bench
 source = Ecto.Adapters.Mnesia.Source.new(
@@ -98,237 +97,239 @@ source = Ecto.Adapters.Mnesia.Source.new(
   }
 )
 
-Benchee.run(
-  %{
-    "ecto.get.id" => {
-      fn ->
-        Enum.map(
-          indexes,
-          fn x ->
-            item = BenchRepo.get(TestSchema, x)
-            if item.indexed_field != "field-#{x}" do
-              IO.puts("ERROR, got wrong value")
-              IO.inspect(item)
-              exit(1)
-            end
-          end)
-      end,
-      before_each: fn input ->
-        input
-      end
-    },
-    "mnesia.get.id" => {
-      fn ->
-        Enum.map(
-          indexes,
-          fn x ->
-            {:ok, item} =
-              BenchRepo.transaction(fn ->
-                case :mnesia.read(:test_table, x) do
-                  [] ->
-                    nil
-
-                  [item] ->
-                    Ecto.Adapters.Mnesia.Record.to_schema(
-                      item,
-                      source)
-                end
-              end)
-              if item.indexed_field != "field-#{x}" do
-                IO.puts("ERROR, got wrong value")
-                IO.inspect(item)
-                exit(1)
-              end
-          end)
-      end,
-      before_each: fn input ->
-        input
-      end
-    },
-    "ecto.get.int.idx" => {
-      fn ->
-        Enum.map(
-          indexes,
-          fn x ->
-            item = BenchRepo.get_by(TestSchema, indexed_int_field: x)
-            if item.indexed_field != "field-#{x}" do
-              IO.puts("ERROR, got wrong value")
-              IO.inspect(item)
-              exit(1)
-            end
-          end)
-      end,
-      before_each: fn input ->
-        input
-      end
-    },
-    "mnesia.get.int.idx" => {
-      fn ->
-        Enum.map(
-          indexes,
-          fn x ->
-            {:ok, item} =
-              BenchRepo.transaction(fn ->
-                case :mnesia.index_read(:test_table, x, :indexed_int_field) do
-                  [] ->
-                    nil
-
-                  [item] ->
-                    Ecto.Adapters.Mnesia.Record.to_schema(
-                      item,
-                      source)
-                end
-              end)
-              if item.indexed_field != "field-#{x}" do
-                IO.puts("ERROR, got wrong value")
-                IO.inspect(item)
-                exit(1)
-              end
-          end)
-      end,
-      before_each: fn input ->
-        input
-      end
-    },
-    "ecto.get.string.idx" => {
-      fn ->
-        Enum.map(
-          indexes,
-          fn x ->
-            item = BenchRepo.get_by(TestSchema, indexed_field: "field-#{x}")
-            if item.indexed_field != "field-#{x}" do
-              IO.puts("ERROR, got wrong value")
-              IO.inspect(item)
-              exit(1)
-            end
-          end)
-      end,
-      before_each: fn input ->
-        input
-      end
-    },
-    "mnesia.get.string.idx" => {
-      fn ->
-        Enum.map(
-          indexes,
-          fn x ->
-            {:ok, item} =
-              BenchRepo.transaction(fn ->
-                case :mnesia.index_read(:test_table, "field-#{x}", :indexed_field) do
-                  [] ->
-                    nil
-
-                  [item] ->
-                    Ecto.Adapters.Mnesia.Record.to_schema(
-                      item,
-                      source)
-                end
-              end)
-              if item.indexed_field != "field-#{x}" do
-                IO.puts("ERROR, got wrong value")
-                IO.inspect(item)
-                exit(1)
-              end
-          end)
-      end,
-      before_each: fn input ->
-        input
-      end
-    },
-    "ecto.get.int.non.idx" => {
-      fn ->
-        Enum.map(
-          indexes,
-          fn x ->
-            item = BenchRepo.get_by(TestSchema, non_indexed_int_field: x)
-            if item.indexed_field != "field-#{x}" do
-              IO.puts("ERROR, got wrong value")
-              IO.inspect(item)
-              exit(1)
-            end
-          end)
-      end,
-      before_each: fn input ->
-        input
-      end
-    },
-    "mnesia.get.int.non.idx" => {
-      fn ->
-        Enum.map(
-          indexes,
-          fn x ->
-            {:ok, item} =
-              BenchRepo.transaction(fn ->
-                case :mnesia.match_object(:test_table, {:_, :_, :_, x, :_, :_, :_, :_}, :read) do
-                  [] ->
-                    nil
-
-                  [item] ->
-                    Ecto.Adapters.Mnesia.Record.to_schema(
-                      item,
-                      source)
-                end
-              end)
-              if item.indexed_field != "field-#{x}" do
-                IO.puts("ERROR, got wrong value")
-                IO.inspect(item)
-                exit(1)
-              end
-          end)
-      end,
-      before_each: fn input ->
-        input
-      end
-    },
-    "ecto.get.string.non.idx" => {
-      fn ->
-        Enum.map(
-          indexes,
-          fn x ->
-            item = BenchRepo.get_by(TestSchema, non_indexed_field: "field-#{x}")
-            if item.indexed_field != "field-#{x}" do
-              IO.puts("ERROR, got wrong value")
-              IO.inspect(item)
-              exit(1)
-            end
-          end)
-      end,
-      before_each: fn input ->
-        input
-      end
-    },
-    "mnesia.get.string.non.idx" => {
-      fn ->
-        Enum.map(
-          indexes,
-          fn x ->
-            {:ok, item} =
-              BenchRepo.transaction(fn ->
-                case :mnesia.match_object(:test_table, {:_, :_, :_, :_, :_, "field-#{x}", :_, :_}, :read) do
-                  [] ->
-                    nil
-
-                  [item] ->
-                    Ecto.Adapters.Mnesia.Record.to_schema(
-                      item,
-                      source)
-                end
-              end)
-              if item.indexed_field != "field-#{x}" do
-                IO.puts("ERROR, got wrong value")
-                IO.inspect(item)
-                exit(1)
-              end
-          end)
-      end,
-      before_each: fn input ->
-        input
-      end,
-      before_each: fn input ->
-        input
-      end
-    }
+benchmarks = %{
+  "ecto.get.id" => {
+    fn ->
+      Enum.map(
+        indexes,
+        fn x ->
+          item = BenchRepo.get(TestSchema, x)
+          if item.indexed_field != "field-#{x}" do
+            IO.puts("ERROR, got wrong value")
+            IO.inspect(item)
+            exit(1)
+          end
+        end)
+    end,
+    before_each: fn input ->
+      input
+    end
   },
+  "mnesia.get.id" => {
+    fn ->
+      Enum.map(
+        indexes,
+        fn x ->
+          {:ok, item} =
+            BenchRepo.transaction(fn ->
+              case :mnesia.read(:test_table, x) do
+                [] ->
+                  nil
+
+                [item] ->
+                  Ecto.Adapters.Mnesia.Record.to_schema(
+                    item,
+                    source)
+              end
+            end)
+            if item.indexed_field != "field-#{x}" do
+              IO.puts("ERROR, got wrong value")
+              IO.inspect(item)
+              exit(1)
+            end
+        end)
+    end,
+    before_each: fn input ->
+      input
+    end
+  },
+  "ecto.get.int.idx" => {
+    fn ->
+      Enum.map(
+        indexes,
+        fn x ->
+          item = BenchRepo.get_by(TestSchema, indexed_int_field: x)
+          if item.indexed_field != "field-#{x}" do
+            IO.puts("ERROR, got wrong value")
+            IO.inspect(item)
+            exit(1)
+          end
+        end)
+    end,
+    before_each: fn input ->
+      input
+    end
+  },
+  "mnesia.get.int.idx" => {
+    fn ->
+      Enum.map(
+        indexes,
+        fn x ->
+          {:ok, item} =
+            BenchRepo.transaction(fn ->
+              case :mnesia.index_read(:test_table, x, :indexed_int_field) do
+                [] ->
+                  nil
+
+                [item] ->
+                  Ecto.Adapters.Mnesia.Record.to_schema(
+                    item,
+                    source)
+              end
+            end)
+            if item.indexed_field != "field-#{x}" do
+              IO.puts("ERROR, got wrong value")
+              IO.inspect(item)
+              exit(1)
+            end
+        end)
+    end,
+    before_each: fn input ->
+      input
+    end
+  },
+  "ecto.get.string.idx" => {
+    fn ->
+      Enum.map(
+        indexes,
+        fn x ->
+          item = BenchRepo.get_by(TestSchema, indexed_field: "field-#{x}")
+          if item.indexed_field != "field-#{x}" do
+            IO.puts("ERROR, got wrong value")
+            IO.inspect(item)
+            exit(1)
+          end
+        end)
+    end,
+    before_each: fn input ->
+      input
+    end
+  },
+  "mnesia.get.string.idx" => {
+    fn ->
+      Enum.map(
+        indexes,
+        fn x ->
+          {:ok, item} =
+            BenchRepo.transaction(fn ->
+              case :mnesia.index_read(:test_table, "field-#{x}", :indexed_field) do
+                [] ->
+                  nil
+
+                [item] ->
+                  Ecto.Adapters.Mnesia.Record.to_schema(
+                    item,
+                    source)
+              end
+            end)
+            if item.indexed_field != "field-#{x}" do
+              IO.puts("ERROR, got wrong value")
+              IO.inspect(item)
+              exit(1)
+            end
+        end)
+    end,
+    before_each: fn input ->
+      input
+    end
+  },
+  "ecto.get.int.non.idx" => {
+    fn ->
+      Enum.map(
+        indexes,
+        fn x ->
+          item = BenchRepo.get_by(TestSchema, non_indexed_int_field: x)
+          if item.indexed_field != "field-#{x}" do
+            IO.puts("ERROR, got wrong value")
+            IO.inspect(item)
+            exit(1)
+          end
+        end)
+    end,
+    before_each: fn input ->
+      input
+    end
+  },
+  "mnesia.get.int.non.idx" => {
+    fn ->
+      Enum.map(
+        indexes,
+        fn x ->
+          {:ok, item} =
+            BenchRepo.transaction(fn ->
+              case :mnesia.match_object(:test_table, {:_, :_, :_, x, :_, :_, :_, :_}, :read) do
+                [] ->
+                  nil
+
+                [item] ->
+                  Ecto.Adapters.Mnesia.Record.to_schema(
+                    item,
+                    source)
+              end
+            end)
+            if item.indexed_field != "field-#{x}" do
+              IO.puts("ERROR, got wrong value")
+              IO.inspect(item)
+              exit(1)
+            end
+        end)
+    end,
+    before_each: fn input ->
+      input
+    end
+  },
+  "ecto.get.string.non.idx" => {
+    fn ->
+      Enum.map(
+        indexes,
+        fn x ->
+          item = BenchRepo.get_by(TestSchema, non_indexed_field: "field-#{x}")
+          if item.indexed_field != "field-#{x}" do
+            IO.puts("ERROR, got wrong value")
+            IO.inspect(item)
+            exit(1)
+          end
+        end)
+    end,
+    before_each: fn input ->
+      input
+    end
+  },
+  "mnesia.get.string.non.idx" => {
+    fn ->
+      Enum.map(
+        indexes,
+        fn x ->
+          {:ok, item} =
+            BenchRepo.transaction(fn ->
+              case :mnesia.match_object(:test_table, {:_, :_, :_, :_, :_, "field-#{x}", :_, :_}, :read) do
+                [] ->
+                  nil
+
+                [item] ->
+                  Ecto.Adapters.Mnesia.Record.to_schema(
+                    item,
+                    source)
+              end
+            end)
+            if item.indexed_field != "field-#{x}" do
+              IO.puts("ERROR, got wrong value")
+              IO.inspect(item)
+              exit(1)
+            end
+        end)
+    end,
+    before_each: fn input ->
+      input
+    end,
+    before_each: fn input ->
+      input
+    end
+  }
+}
+
+Benchee.run(
+  benchmarks,
   time: 10,
   memory_time: 2,
   formatters: [

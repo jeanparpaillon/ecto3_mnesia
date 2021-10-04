@@ -12,8 +12,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   alias Ecto.Query.SelectExpr
 
   @behaviour Query
-  @dialyzer {:no_return, [build_query: 4]}
-  @dialyzer :no_opaque
+  # @dialyzer {:nowarn_function, qlc_handle: 2}
 
   @order_mapping %{
     asc: :ascending,
@@ -84,24 +83,40 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   defp build_query(select, joins, filters, context) do
     {vars, generators} = select(select, context)
 
+    context =
+      context
+      |> qualifiers(filters)
+      |> joins(joins)
+
+      binding_vars = Context.bindings(context)
+      extra_bindings = Context.extra_bindings(context)
+
+    pt_bindings =
+      binding_vars
+      |> Enum.map(& {&1, nil})
+      |> Kernel.++(extra_bindings)
+
+    expr = {:lc, anno(), vars, generators ++ context.joins ++ context.qualifiers}
+    handle = qlc_handle(expr, pt_bindings)
+
     fn params ->
-      context =
-        context
-        |> qualifiers(filters)
-        |> joins(joins)
-
-      expr = {:lc, 1, vars, generators ++ context.joins ++ context.qualifiers}
-
       bindings =
-        Context.bindings(context)
+        binding_vars
         |> Enum.zip(params)
-        |> Kernel.++(Context.extra_bindings(context))
+        |> Kernel.++(extra_bindings)
 
-      {:ok, {:call, _, _, handle}} = :qlc_pt.transform_expression(expr, bindings)
       {:value, qlc_lc, _} = :erl_eval.exprs(handle, bindings)
       :qlc.q(qlc_lc, [])
     end
   end
+
+  @spec qlc_handle(any(), any()) :: any() | none()
+  defp qlc_handle(expr, bindings) do
+    {:ok, {:call, _, _, handle}} = :qlc_pt.transform_expression(expr, bindings)
+    handle
+  end
+
+  defp anno, do: :erl_anno.new(1)
 
   defp unbind_limit(nil, _params), do: 10
 
@@ -239,10 +254,12 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
          context
        ) do
     erl_var = Context.source_var(context, source_index, field)
-    {binding_vars, context} = Enum.reduce((index + (length-1))..index, {{nil, 1}, context}, fn i, {acc, context} ->
-      {var, context} = Context.binding_var(context, i)
-      {{:cons, 1, {:var, 1, var}, acc}, context}
-    end)
+
+    {binding_vars, context} =
+      Enum.reduce((index + (length - 1))..index, {{nil, 1}, context}, fn i, {acc, context} ->
+        {var, context} = Context.binding_var(context, i)
+        {{:cons, 1, {:var, 1, var}, acc}, context}
+      end)
 
     {{:call, 1, {:remote, 1, {:atom, 1, :lists}, {:atom, 1, :member}},
       [{:var, 1, erl_var}, binding_vars]}, context}
@@ -286,7 +303,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
          {op, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, value]},
          context
        ) do
-    erl_var = Context.source_var(context, source_index,field)
+    erl_var = Context.source_var(context, source_index, field)
     {var, context} = Context.extra_binding(context, value)
     {{:op, 1, to_qlc_op(op), {:var, 1, erl_var}, {:var, 1, var}}, context}
   end
