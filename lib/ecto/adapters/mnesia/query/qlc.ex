@@ -12,7 +12,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   alias Ecto.Query.SelectExpr
 
   @behaviour Query
-  @dialyzer {:no_return, [build_query: 4, to_query_handle: 2]}
+  @dialyzer {:no_return, [build_query: 4]}
   @dialyzer :no_opaque
 
   @order_mapping %{
@@ -90,19 +90,12 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
         |> qualifiers(filters)
         |> joins(joins)
 
-      bindings =
-        Enum.reduce(context.bindings, :erl_eval.new_bindings(), fn {k, v}, acc ->
-          :erl_eval.add_binding(k, v, acc)
-        end)
+      expr = {:lc, 1, vars, generators ++ context.joins ++ context.qualifiers}
 
-      to_query_handle({:lc, 1, vars, generators ++ context.joins ++ context.qualifiers}, bindings)
+      {:ok, {:call, _, _, handle}} = :qlc_pt.transform_expression(expr, context.bindings)
+      {:value, qlc_lc, _} = :erl_eval.exprs(handle, context.bindings)
+      :qlc.q(qlc_lc, [])
     end
-  end
-
-  defp to_query_handle(expr, bindings) do
-    {:ok, {:call, _, _, handle}} = :qlc_pt.transform_expression(expr, bindings)
-    {:value, qlc_lc, _} = :erl_eval.exprs(handle, bindings)
-    :qlc.q(qlc_lc, [])
   end
 
   defp unbind_limit(nil, _params), do: 10
