@@ -6,8 +6,6 @@ defmodule Ecto.Adapters.Mnesia.Query do
   * `Ecto.Adapters.Mnesia.Query.Get` for simple `Repo.get` -like queries
   * `Ecto.Adapters.Mnesia.Query.Qlc` for more complex ones
   """
-  require Qlc
-
   alias Ecto.Query.BooleanExpr
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection

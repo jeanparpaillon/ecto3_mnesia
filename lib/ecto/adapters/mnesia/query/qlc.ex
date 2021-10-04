@@ -2,6 +2,8 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   @moduledoc """
   Builds qlc query out of Ecto.Query
   """
+  require Ecto.Adapters.Mnesia.Query
+
   alias Ecto.Adapters.Mnesia.Query
   alias Ecto.Adapters.Mnesia.Query.Qlc.Context
   alias Ecto.Adapters.Mnesia.Source
@@ -51,17 +53,31 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   @spec answers(limit :: %QueryExpr{} | nil, offset :: %QueryExpr{} | nil) ::
           (query_handle :: :qlc.query_handle(), context :: Keyword.t() -> list(tuple()))
   def answers(limit, offset) do
-    fn query, context ->
-      limit = unbind_limit(limit, context)
-      offset = unbind_offset(offset, context)
-      cursor = :qlc.cursor(query)
+    fn query, params ->
+      Stream.resource(
+        fn ->
+          limit = unbind_limit(limit, params)
+          offset = unbind_offset(offset, params)
+          cursor = :qlc.cursor(query)
 
-      if offset > 0 do
-        :qlc.next_answers(cursor, offset)
-      end
+          if offset > 0 do
+            _ = :qlc.next_answers(cursor, offset)
+          end
 
-      :qlc.next_answers(cursor, limit)
-      |> :qlc.e()
+          {cursor, limit}
+        end,
+        fn
+          {cursor, 0} ->
+            {:halt, cursor}
+
+          {cursor, limit} ->
+            case :qlc.next_answers(cursor, limit) do
+              [] -> {:halt, cursor}
+              results -> {results, {cursor, max(0, limit - length(results))}}
+            end
+        end,
+        fn cursor -> :qlc.delete_cursor(cursor) end
+      )
     end
   end
 
@@ -89,21 +105,21 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
     :qlc.q(qlc_lc, [])
   end
 
-  defp unbind_limit(nil, _context), do: :all_remaining
+  defp unbind_limit(nil, _params), do: 10
 
-  defp unbind_limit(%QueryExpr{expr: {:^, [], [param_index]}}, context) do
-    Enum.at(context[:params], param_index)
+  defp unbind_limit(%QueryExpr{expr: {:^, [], [param_index]}}, params) do
+    Enum.at(params, param_index)
   end
 
-  defp unbind_limit(%QueryExpr{expr: limit}, _context) when is_integer(limit), do: limit
+  defp unbind_limit(%QueryExpr{expr: limit}, _params) when is_integer(limit), do: limit
 
   defp unbind_offset(nil, _context), do: 0
 
-  defp unbind_offset(%QueryExpr{expr: {:^, [], [param_index]}}, context) do
-    Enum.at(context[:params], param_index)
+  defp unbind_offset(%QueryExpr{expr: {:^, [], [param_index]}}, params) do
+    Enum.at(params, param_index)
   end
 
-  defp unbind_offset(%QueryExpr{expr: offset}, _context) when is_integer(offset), do: offset
+  defp unbind_offset(%QueryExpr{expr: offset}, _params) when is_integer(offset), do: offset
 
   defp select(select, context) do
     {q_fields(select, context),

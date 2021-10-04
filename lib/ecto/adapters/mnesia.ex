@@ -167,7 +167,7 @@ defmodule Ecto.Adapters.Mnesia do
       ) do
     case :mnesia.transaction(fn ->
            query.(params)
-           |> answers.()
+           |> answers.(params)
            |> Enum.map(&Tuple.to_list(&1))
          end) do
       {:atomic, result} ->
@@ -227,12 +227,11 @@ defmodule Ecto.Adapters.Mnesia do
   @impl Ecto.Adapter.Schema
   def update(_adapter_meta, schema_meta, params, filters, returning, _opts) do
     source = Connection.source(schema_meta)
-    answers_context = [params: params]
     {_cache, prepared} = Mnesia.Query.Qlc.query(:all, [], [source])
     query = prepared.(filters)
 
     with {selectTime, {:atomic, [attributes]}} <-
-           tc_tx(fn -> query.(params) |> Mnesia.Query.Qlc.answers(nil, nil).(answers_context) end),
+           tc_tx(fn -> query.(params) |> Mnesia.Query.Qlc.answers(nil, nil).(params) |> Enum.to_list() end),
          {updateTime, {:atomic, update}} <-
            tc_tx(fn -> do_update(attributes, params, source) end) do
       result = Record.select(update, returning, source)
@@ -268,7 +267,7 @@ defmodule Ecto.Adapters.Mnesia do
     with {selectTime, {:atomic, [[id | _t]]}} <-
            tc_tx(fn ->
              query.([])
-             |> Mnesia.Query.Qlc.answers(nil, nil).(params: [])
+             |> Mnesia.Query.Qlc.answers(nil, nil).([])
              |> Enum.map(&Tuple.to_list(&1))
            end),
          {deleteTime, {:atomic, :ok}} <-
@@ -410,12 +409,10 @@ defmodule Ecto.Adapters.Mnesia do
          },
          params
        ) do
-    context = [params: params]
-
     case tc_tx(fn ->
            query.(params)
            |> sort.()
-           |> answers.(context)
+           |> answers.(params)
            |> Enum.map(&Tuple.to_list(&1))
          end) do
       {time, {:atomic, result}} ->
@@ -443,11 +440,9 @@ defmodule Ecto.Adapters.Mnesia do
          },
          params
        ) do
-    answers_context = [params: params]
-
     case tc_tx(fn ->
            query.(params)
-           |> answers.(answers_context)
+           |> answers.(params)
            |> Enum.map(&new_record.(&1, params))
            |> Enum.map(fn record ->
              with :ok <- :mnesia.write(source.table, record, :write) do
@@ -482,11 +477,9 @@ defmodule Ecto.Adapters.Mnesia do
          },
          params
        ) do
-    context = [params: params]
-
     case tc_tx(fn ->
            query.(params)
-           |> answers.(context)
+           |> answers.(params)
            |> Enum.map(fn tuple ->
              # Works only if query selects id at first, see: https://gitlab.com/patatoid/ecto3_mnesia/-/issues/15
              id = elem(tuple, 0)
