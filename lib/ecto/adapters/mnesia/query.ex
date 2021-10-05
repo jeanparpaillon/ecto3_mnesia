@@ -10,6 +10,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
 
   alias Ecto.Query.BooleanExpr
   alias Ecto.Adapters.Mnesia
+  alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Query
   alias Ecto.Adapters.Mnesia.Record
   alias Ecto.Adapters.Mnesia.Source
@@ -132,7 +133,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
   defp sources(sources) do
     sources
     |> Tuple.to_list()
-    |> Enum.map(&Source.new/1)
+    |> Enum.map(&Connection.source/1)
   end
 
   defp new_record(source, updates) do

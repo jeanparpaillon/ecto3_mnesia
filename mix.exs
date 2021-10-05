@@ -20,7 +20,8 @@ defmodule EctoMnesia.MixProject do
         extras: ["README.md"]
       ],
       elixirc_paths: elixirc_paths(Mix.env()),
-      consolidate_protocols: Mix.env() != :test
+      consolidate_protocols: Mix.env() != :test,
+      aliases: aliases()
     ]
   end
 
@@ -39,7 +40,11 @@ defmodule EctoMnesia.MixProject do
       {:ecto, "~> 3.0"},
       {:qlc, "~> 1.0"},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
-      {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false}
+      {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false},
+      # Benchmarks
+      {:benchee, "~> 1.0", only: :dev},
+      {:benchee_html, "~> 1.0", only: :dev},
+      {:benchee_json, "~> 1.0", only: :dev}
     ]
   end
 
@@ -57,5 +62,11 @@ defmodule EctoMnesia.MixProject do
     """
     Mnesia adapter for Ecto 3
     """
+  end
+
+  defp aliases do
+    [
+      benchmark: "run benchmarks/get.exs"
+    ]
   end
 end

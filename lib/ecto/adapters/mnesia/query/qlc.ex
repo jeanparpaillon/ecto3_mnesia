@@ -10,6 +10,8 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   alias Ecto.Query.SelectExpr
 
   @behaviour Query
+  @dialyzer {:no_return, [build_query: 4, to_query_handle: 2]}
+  @dialyzer :no_opaque
 
   @order_mapping %{
     asc: :ascending,
@@ -24,7 +26,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
       filters -> build_query(select, joins, filters, context)
     end
 
-    {:nocache, q}
+    {:cache, q}
   end
 
   def sort([], _select, _sources) do
@@ -64,7 +66,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   end
 
   defp build_query(select, joins, filters, context) do
-    select = select(select, context)
+    {vars, generators} = select(select, context)
 
     fn params ->
       context =
@@ -72,13 +74,19 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
         |> qualifiers(filters)
         |> joins(joins)
 
-      comprehension =
-        [select, Enum.join(context.joins, ", "), Enum.join(context.qualifiers, ", ")]
-        |> Enum.reject(fn component -> String.length(component) == 0 end)
-        |> Enum.join(", ")
+      bindings =
+        Enum.reduce(context.bindings, :erl_eval.new_bindings(), fn {k, v}, acc ->
+          :erl_eval.add_binding(k, v, acc)
+        end)
 
-      :qlc.string_to_handle('[#{comprehension}].', [], Qlc.bind(context.bindings))
+      to_query_handle({:lc, 1, vars, generators ++ context.joins ++ context.qualifiers}, bindings)
     end
+  end
+
+  defp to_query_handle(expr, bindings) do
+    {:ok, {:call, _, _, handle}} = :qlc_pt.transform_expression(expr, bindings)
+    {:value, qlc_lc, _} = :erl_eval.exprs(handle, bindings)
+    :qlc.q(qlc_lc, [])
   end
 
   defp unbind_limit(nil, _context), do: :all_remaining
@@ -98,14 +106,33 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   defp unbind_offset(%QueryExpr{expr: offset}, _context) when is_integer(offset), do: offset
 
   defp select(select, context) do
-    fields = fields(select, context)
+    {q_fields(select, context),
+     Enum.map(context.sources, fn source ->
+       record_pattern = {:tuple, 1, [{:var, 1, :_} | Source.qlc_attributes_pattern(source)]}
 
-    "{#{Enum.join(fields, ", ")}} || " <>
-      (Enum.map(context.sources, fn source ->
-         "#{record_pattern(source)} <- mnesia:table('#{source.table}')"
-       end)
-       |> Enum.join(", "))
+       {:generate, 1, record_pattern,
+        {:call, 1, {:remote, 1, {:atom, 1, :mnesia}, {:atom, 1, :table}},
+         [{:atom, 1, source.table}]}}
+     end)}
   end
+
+  defp q_fields(%SelectExpr{fields: fields}, context) do
+    {:tuple, 1, Enum.map(fields, &q_field(&1, context))}
+  end
+
+  defp q_fields(:all, %{sources: [source | _t]}) do
+    {:tuple, 1, Source.qlc_attributes_pattern(source)}
+  end
+
+  defp q_fields(_, %{sources: [source | _t]}) do
+    {:tuple, 1, Source.qlc_attributes_pattern(source)}
+  end
+
+  defp q_field({{_, _, [{:&, [], [source_index]}, field]}, [], []}, context) do
+    {:var, 1, Source.to_erl_var(context.sources_index[source_index], field)}
+  end
+
+  defp q_field(_, _), do: nil
 
   defp fields(%SelectExpr{fields: fields}, context) do
     Enum.map(fields, &field(&1, context))
@@ -152,15 +179,12 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
     %{context | joins: Enum.reverse(context.joins)}
   end
 
-  defp record_pattern(source) do
-    "{#{Enum.join(Source.qlc_record_pattern(source), ", ")}}"
-  end
-
-  defp to_qlc(true, context), do: {"true", context}
+  # Returns erlang forms from Ecto Query AST
+  defp to_qlc(true, context), do: {{:atom, 1, true}, context}
 
   defp to_qlc({field, value}, %{sources: [source]} = context) do
     {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, value)
-    {"#{erl_var} == #{bind_var}", context}
+    {{:op, 1, :==, {:var, 1, erl_var}, {:var, 1, bind_var}}, context}
   end
 
   defp to_qlc(
@@ -169,7 +193,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
        ) do
     {a_qlc, context} = to_qlc(a, context)
     {b_qlc, context} = to_qlc(b, context)
-    {"(#{a_qlc} andalso #{b_qlc})", context}
+    {{:op, 1, :andalso, a_qlc, b_qlc}, context}
   end
 
   defp to_qlc(
@@ -178,7 +202,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
        ) do
     {a_qlc, context} = to_qlc(a, context)
     {b_qlc, context} = to_qlc(b, context)
-    {"(#{a_qlc} orelse #{b_qlc})", context}
+    {{:op, 1, :orelse, a_qlc, b_qlc}, context}
   end
 
   defp to_qlc(
@@ -187,12 +211,12 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
        ) do
     source = Enum.at(context.sources, source_index)
     erl_var = Source.to_erl_var(source, field)
-    {"#{erl_var} == nil", context}
+    {{:op, 1, :==, {:var, 1, erl_var}, {:atom, 1, nil}}, context}
   end
 
   defp to_qlc({:not, [], [expr]}, context) do
     {expr_qlc, context} = to_qlc(expr, context)
-    {"not (#{expr_qlc})", context}
+    {{:op, 1, :not, expr_qlc}, context}
   end
 
   defp to_qlc(
@@ -211,7 +235,9 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
        when is_list(values) do
     source = Enum.at(context.sources, source_index)
     {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, values)
-    {"lists:member(#{erl_var}, #{bind_var})", context}
+
+    {{:call, 1, {:remote, 1, {:atom, 1, :lists}, {:atom, 1, :member}},
+      [{:var, 1, erl_var}, {:var, 1, bind_var}]}, context}
   end
 
   defp to_qlc(
@@ -234,7 +260,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
     value_source = Enum.at(context.sources, value_source_index)
     erl_var = Source.to_erl_var(key_source, key_field)
     value = Source.to_erl_var(value_source, value_field)
-    {"#{erl_var} #{op} #{value}", context}
+    {{:op, 1, to_qlc_op(op), {:var, 1, erl_var}, {:var, 1, value}}, context}
   end
 
   defp to_qlc(
@@ -243,14 +269,10 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
        ) do
     source = Enum.at(context.sources, source_index)
     {erl_var, bind_var, context} = Context.add_binding(context, {field, source}, value)
-    {"#{erl_var} #{to_qlc_binary_op(op)} #{bind_var}", context}
+    {{:op, 1, to_qlc_op(op), {:var, 1, erl_var}, {:var, 1, bind_var}}, context}
   end
 
-  defp to_qlc_binary_op(:==), do: "=="
-  defp to_qlc_binary_op(:!=), do: "=/="
-  defp to_qlc_binary_op(:<=), do: "=<"
-  defp to_qlc_binary_op(:>=), do: ">="
-  defp to_qlc_binary_op(:<), do: "<"
-  defp to_qlc_binary_op(:>), do: ">"
-  defp to_qlc_binary_op(op), do: op
+  defp to_qlc_op(:!=), do: :"=/="
+  defp to_qlc_op(:<=), do: :"=<"
+  defp to_qlc_op(op), do: op
 end
