@@ -79,7 +79,7 @@ defmodule Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest do
   test "preload has_many association" do
     a = Ecto.UUID.generate()
     b = Ecto.UUID.generate()
-    IO.inspect :mnesia.transaction(fn ->
+    :mnesia.transaction(fn ->
       :mnesia.write(@has_many_table_name, {HasManySchema, a, "has many"}, :write)
       :mnesia.write(@has_many_table_name, {HasManySchema, b, "has many"}, :write)
       :mnesia.write(@belongs_to_table_name, {BelongsToSchema, a, "belongs to", a}, :write)
@@ -107,9 +107,7 @@ defmodule Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest do
       :mnesia.write(@belongs_to_table_name, {BelongsToSchema, b, "belongs to", a}, :write)
     end)
 
-    IO.inspect TestRepo.all(BelongsToSchema)
-
-    case TestRepo.get(BelongsToSchema, a) |> TestRepo.preload(:has_many) |> IO.inspect do
+    case TestRepo.get(BelongsToSchema, a) |> TestRepo.preload(:has_many) do
       %BelongsToSchema{has_many: has_many} ->
         assert has_many == TestRepo.get(HasManySchema, a)
 

@@ -66,6 +66,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
     |> pk_query?(original)
     |> case do
       %{single_pkey?: true, join_query?: false, pk_query?: true} -> Query.Get
+      %{join_query?: false} -> Query.MatchSpec
       _ -> Query.Qlc
     end
   end

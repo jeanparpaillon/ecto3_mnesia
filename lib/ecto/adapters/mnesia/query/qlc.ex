@@ -23,7 +23,6 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
     context = Context.new(sources)
 
     q = fn
-      [%BooleanExpr{}] = wheres -> build_query(select, joins, wheres, context)
       filters -> build_query(select, joins, filters, context)
     end
 

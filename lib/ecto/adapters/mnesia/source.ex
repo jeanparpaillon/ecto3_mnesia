@@ -91,6 +91,28 @@ defmodule Ecto.Adapters.Mnesia.Source do
     end)
   end
 
+  @doc false
+  def ms_attributes_pattern(source) do
+    source.attributes
+    |> Enum.map(fn attribute -> to_ms_var(source, attribute) end)
+  end
+
+  @doc false
+  def qlc_record_pattern(%{schema_erl_prefix: prefix} = source) do
+    [prefix | qlc_attributes_pattern(source)]
+  end
+
+  @doc false
+  def ms_record_pattern(source) do
+    [:"$0" | ms_attributes_pattern(source)]
+  end
+
+  @doc false
+  def to_ms_var(source, attribute) do
+    index = Enum.find_index(source.attributes, fn current -> current == attribute end)
+    :"$#{index + 1}"
+  end
+
   ###
   ### Priv
   ###
