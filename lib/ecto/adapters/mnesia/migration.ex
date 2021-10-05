@@ -118,7 +118,7 @@ defmodule Ecto.Adapters.Mnesia.Migration do
     [
       index: index,
       attributes: source.attributes,
-      type: :set,
+      type: :ordered_set,
       record_name: source.record_name
     ]
     |> Keyword.merge(
