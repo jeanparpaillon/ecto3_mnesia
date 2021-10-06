@@ -36,7 +36,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
 
   defmodule ImplSelector do
     @moduledoc false
-    defstruct single_pkey?: false, join_query?: false, pk_query?: false, pk: nil
+    defstruct single_pkey?: false, join_query?: false, pk_query?: false, single_table?: false, pk: nil
   end
 
   @callback query(select :: term(), joins :: term(), sources :: term()) ::
@@ -64,9 +64,10 @@ defmodule Ecto.Adapters.Mnesia.Query do
     |> single_pkey?(original)
     |> join_query?(original)
     |> pk_query?(original)
+    |> single_table?(original)
     |> case do
       %{single_pkey?: true, join_query?: false, pk_query?: true} -> Query.Get
-      %{join_query?: false} -> Query.MatchSpec
+      %{single_table?: true} -> Query.MatchSpec
       _ -> Query.Qlc
     end
   end
@@ -92,6 +93,10 @@ defmodule Ecto.Adapters.Mnesia.Query do
   defp set_new_record(%__MODULE__{original: original, sources: sources} = q) do
     %{q | new_record: new_record(Enum.at(sources, 0), original.updates)}
   end
+
+  defp single_table?(acc, %Ecto.Query{sources: {_source}}), do: %{acc| single_table?: true}
+
+  defp single_table?(acc, _), do: acc
 
   defp single_pkey?(acc, %Ecto.Query{sources: {source}}) do
     with [source] <- sources({source}),
