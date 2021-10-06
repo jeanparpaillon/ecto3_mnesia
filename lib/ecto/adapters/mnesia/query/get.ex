@@ -8,21 +8,34 @@ defmodule Ecto.Adapters.Mnesia.Query.Get do
 
   @behaviour Query
 
-  def query(_select, _joins, [%Source{table: table}]) do
+  def query(select, _joins, [source]) do
     q = fn [
              %BooleanExpr{
-               expr:
-                 {:==, [],
-                  [{{:., [], [{:&, [], [_source_index]}, _field]}, [], []}, {:^, [], [index]}]}
+               expr: {:==, [], [{{:., [], [{:&, [], [_source_index]}, _field]}, [], []}, value]}
              }
            ] ->
       fn params ->
-        :mnesia.read(table, Enum.at(params, index))
-        |> Enum.map(fn record -> Tuple.delete_at(record, 0) end)
+        pk = unbind(value, params)
+        get_by_pk(source, pk, select)
       end
     end
 
     {:cache, q}
+  end
+
+  defp unbind({:^, [], [index]}, params), do: Enum.at(params, index)
+  defp unbind(value, _params), do: value
+
+  defp get_by_pk(%Source{table: table} = source, pk, select) do
+    :mnesia.read(table, pk)
+    |> Enum.map(fn record ->
+      select.fields
+      |> Enum.map(fn
+        {{:., _type, [{:&, [], [_source_index]}, field]}, [], []} ->
+          elem(record, source.index[field])
+      end)
+      |> List.to_tuple()
+    end)
   end
 
   def sort(_orders_by, _select, _sources) do
