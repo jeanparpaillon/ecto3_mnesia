@@ -200,7 +200,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       :mnesia.transaction(fn ->
         :mnesia.write(
           @table_name,
-          {TestSchema, id, "field", NaiveDateTime.utc_now(), NaiveDateTime.utc_now()},
+          {TestSchema, id, "field", 1, 1},
           :write
         )
       end)
@@ -218,7 +218,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       :mnesia.transaction(fn ->
         :mnesia.write(
           @table_name,
-          {TestSchema, id, "field", NaiveDateTime.utc_now(), NaiveDateTime.utc_now()},
+          {TestSchema, id, "field", 1, 1},
           :write
         )
       end)

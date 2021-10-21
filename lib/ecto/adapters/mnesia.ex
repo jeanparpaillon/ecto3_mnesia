@@ -106,6 +106,7 @@ defmodule Ecto.Adapters.Mnesia do
   alias Ecto.Adapters.Mnesia.Constraint
   alias Ecto.Adapters.Mnesia.Record
   alias Ecto.Adapters.Mnesia.Source
+  alias Ecto.Adapters.Mnesia.Type
 
   require Logger
 
@@ -121,9 +122,6 @@ defmodule Ecto.Adapters.Mnesia do
   def checked_out?(_adapter_meta), do: true
 
   @impl Ecto.Adapter
-  def dumpers(_, type), do: [type]
-
-  @impl Ecto.Adapter
   def ensure_all_started(_config, _type) do
     {:ok, _} = Application.ensure_all_started(:mnesia)
     {:ok, []}
@@ -135,6 +133,37 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   @impl Ecto.Adapter
+  def dumpers(:utc_datetime, type), do: [type, &Type.dump_datetime(&1, :second)]
+
+  def dumpers(:utc_datetime_usec, type), do: [type, &Type.dump_datetime(&1, :microsecond)]
+
+  def dumpers(:naive_datetime, type), do: [type, &Type.dump_naive_datetime(&1, :second)]
+
+  def dumpers(:naive_datetime_usec, type), do: [type, &Type.dump_naive_datetime(&1, :microsecond)]
+
+  def dumpers(:date, type), do: [type, &Type.dump_date/1]
+
+  def dumpers(:time, type), do: [type, &Type.dump_time/1]
+
+  def dumpers(:time_usec, type), do: [type, &Type.dump_time_usec/1]
+
+  def dumpers(_, type), do: [type]
+
+  @impl Ecto.Adapter
+  def loaders(:utc_datetime, type), do: [&Type.load_datetime(&1, :second), type]
+
+  def loaders(:utc_datetime_usec, type), do: [&Type.load_datetime(&1, :microsecond), type]
+
+  def loaders(:naive_datetime, type), do: [&Type.load_naive_datetime(&1, :second), type]
+
+  def loaders(:naive_datetime_usec, type), do: [&Type.load_naive_datetime(&1, :microsecond), type]
+
+  def loaders(:date, type), do: [&Type.load_date/1, type]
+
+  def loaders(:time, type), do: [&Type.load_time/1, type]
+
+  def loaders(:time_usec, type), do: [&Type.load_time_usec/1, type]
+
   def loaders(_primitive, type), do: [type]
 
   @impl Ecto.Adapter.Queryable
@@ -285,12 +314,12 @@ defmodule Ecto.Adapters.Mnesia do
 
     select_fun = fn ->
       try do
-      Mnesia.Query.Qlc.answers(nil, nil).(query.([]), [])
-      |> Enum.map(&Tuple.to_list(&1))
+        Mnesia.Query.Qlc.answers(nil, nil).(query.([]), [])
+        |> Enum.map(&Tuple.to_list(&1))
       rescue
         _ ->
           {:atomic, []}
-        end
+      end
     end
 
     with {selectTime, {:atomic, [[id | _t]]}} <-
