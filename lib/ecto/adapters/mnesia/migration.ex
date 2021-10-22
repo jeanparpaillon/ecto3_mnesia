@@ -2,6 +2,7 @@ defmodule Ecto.Adapters.Mnesia.Migration do
   @moduledoc """
   Functions for dealing with schema migrations
   """
+  alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Constraint
   alias Ecto.Adapters.Mnesia.Source
 
@@ -42,8 +43,12 @@ defmodule Ecto.Adapters.Mnesia.Migration do
 
   Returns created table name
   """
-  @spec create_table(module(), create_opts()) :: {:ok, table()} | :ignore | {:error, term()}
-  def create_table(schema, opts \\ []) when is_list(opts) do
+  @spec create_table(module(), module(), create_opts()) ::
+          {:ok, table()} | :ignore | {:error, term()}
+  def create_table(repo, schema, opts \\ []) when is_list(opts) do
+    ensure_db_dir!(repo)
+    ensure_schema(repo)
+
     source = Source.new(%{schema: schema})
     opts = build_options(source, opts)
 
@@ -57,11 +62,11 @@ defmodule Ecto.Adapters.Mnesia.Migration do
   @doc """
   Creates table and wait for its creation
   """
-  @spec sync_create_table(module(), sync_create_opts()) :: :ok | {:error, term()}
-  def sync_create_table(schema, opts \\ []) when is_list(opts) do
+  @spec sync_create_table(module(), module(), sync_create_opts()) :: :ok | {:error, term()}
+  def sync_create_table(repo, schema, opts \\ []) when is_list(opts) do
     timeout = Keyword.get(opts, :timeout, 5_000)
 
-    case create_table(schema, opts) do
+    case create_table(repo, schema, opts) do
       {:ok, table} -> wait_for_table(table, timeout)
       :ignore -> :ok
       {:error, reason} -> {:error, reason}
@@ -141,6 +146,34 @@ defmodule Ecto.Adapters.Mnesia.Migration do
       :ok -> :ok
       {:error, reason} -> {:error, reason}
       {:timeout, [table]} -> {:error, {:timeout, table}}
+    end
+  end
+
+  defp ensure_db_dir!(repo) do
+    repo_dir = repo.config()[:path]
+
+    repo_dir =
+      if repo_dir do
+        Path.expand(repo_dir)
+      else
+        nil
+      end
+
+    mnesia_dir = :mnesia |> Application.get_env(:dir) |> to_string() |> Path.expand()
+
+    if repo_dir && mnesia_dir != repo_dir do
+      raise "Repo #{inspect(repo)} path is set to: #{repo_dir}. " <>
+              "mnesia dir is set to: #{mnesia_dir}. " <>
+              "Ensure Repo is started before calling `create_table`"
+    end
+  end
+
+  defp ensure_schema(repo) do
+    nodes = repo.config()[:nodes] || [node()]
+
+    with id_seq when id_seq in [:ok, :already_exists] <- Connection.ensure_id_seq_table(nodes),
+         cons when cons in [:ok, :alread_exists] <- Connection.ensure_constraints_table(nodes) do
+      :ok
     end
   end
 end
