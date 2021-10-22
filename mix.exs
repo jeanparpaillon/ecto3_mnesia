@@ -10,7 +10,7 @@ defmodule EctoMnesia.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       dialyzer: [
-        plt_add_apps: [:mnesia]
+        plt_add_apps: [:mnesia, :mix]
       ],
       source_url: "https://gitlab.com/patatoid/ecto3_mnesia",
       description: description(),
