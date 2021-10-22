@@ -31,7 +31,7 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
   end
 
   setup_all do
-    :ok = Mnesia.Migration.sync_create_table(TestSchema, ram_copies: [node()], type: :ordered_set)
+    :ok = Mnesia.Migration.sync_create_table(TestRepo, TestSchema, ram_copies: [node()], type: :ordered_set)
 
     []
   end

@@ -72,7 +72,7 @@ defmodule Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest do
   setup_all do
     [BelongsToSchema, HasManySchema, ManyToManySchemaA, ManyToManySchemaB]
     |> Enum.each(fn schema ->
-      :ok = Mnesia.Migration.sync_create_table(schema, ram_copies: [node()])
+      :ok = Mnesia.Migration.sync_create_table(TestRepo, schema, ram_copies: [node()])
     end)
   end
 
