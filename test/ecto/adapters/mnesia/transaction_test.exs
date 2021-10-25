@@ -22,7 +22,7 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
 
   setup_all do
     :ok = Mnesia.Migration.drop_table(TestSchema)
-    :ok = Mnesia.Migration.sync_create_table(TestSchema, ram_copies: [node()], type: :ordered_set)
+    :ok = Mnesia.Migration.sync_create_table(TestRepo, TestSchema, ram_copies: [node()], type: :ordered_set)
 
     :ok
   end

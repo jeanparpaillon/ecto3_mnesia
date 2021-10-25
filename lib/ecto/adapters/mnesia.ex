@@ -129,6 +129,8 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter
   def init(config \\ []) do
+    set_mnesia_env(config)
+
     {:ok, Connection.child_spec(config), %{}}
   end
 
@@ -374,6 +376,8 @@ defmodule Ecto.Adapters.Mnesia do
   def storage_up(options) do
     nodes = options[:nodes] || [node()]
 
+    set_mnesia_env(options)
+
     ret =
       if storage_status(options) == :down do
         :mnesia.stop()
@@ -401,6 +405,8 @@ defmodule Ecto.Adapters.Mnesia do
   @impl Ecto.Adapter.Storage
   def storage_down(options) do
     :mnesia.stop()
+
+    set_mnesia_env(options)
 
     case :mnesia.delete_schema(options[:nodes] || [node()]) do
       :ok ->
@@ -663,4 +669,14 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   defp tc_tx(fun), do: :timer.tc(:mnesia, :transaction, [fun])
+
+  defp set_mnesia_env(options) do
+    if options[:path] do
+      :mnesia.stop()
+      Application.put_env(:mnesia, :dir, '#{options[:path]}', persistent: true)
+      :mnesia.start()
+    else
+      :ok
+    end
+  end
 end

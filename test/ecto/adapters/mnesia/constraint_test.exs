@@ -37,8 +37,8 @@ defmodule Ecto.Adapters.Mnesia.ConstraintTest do
   end
 
   setup_all do
-    :ok = Mnesia.Migration.sync_create_table(ParentSchema)
-    :ok = Mnesia.Migration.sync_create_table(ChildSchema)
+    :ok = Mnesia.Migration.sync_create_table(Repo, ParentSchema)
+    :ok = Mnesia.Migration.sync_create_table(Repo, ChildSchema)
     :ok = Mnesia.Migration.references(ChildSchema, :parent)
 
     :ok
