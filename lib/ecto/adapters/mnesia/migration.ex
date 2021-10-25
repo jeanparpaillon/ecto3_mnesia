@@ -6,6 +6,8 @@ defmodule Ecto.Adapters.Mnesia.Migration do
   alias Ecto.Adapters.Mnesia.Constraint
   alias Ecto.Adapters.Mnesia.Source
 
+  @type t :: {module(), Keyword.t()}
+
   @type table() :: atom()
   @type access_opt() :: {:access_mode, :read_write | :read_only}
   @type disc_copies_opt() :: {:disc_copies, [node()]}
@@ -56,6 +58,16 @@ defmodule Ecto.Adapters.Mnesia.Migration do
       {:atomic, :ok} -> {:ok, source.table}
       {:aborted, {:already_exists, _}} -> :ignore
       {:aborted, error} -> {:error, error}
+    end
+  end
+
+  @doc """
+  Returns true if table is stored in RAM
+  """
+  def ram_storage?({_, opts}) do
+    case Keyword.get(opts, :ram_copies, []) do
+      [] -> false
+      _ -> true
     end
   end
 

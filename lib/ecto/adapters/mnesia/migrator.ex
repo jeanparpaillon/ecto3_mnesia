@@ -4,8 +4,13 @@ defmodule Ecto.Adapters.Mnesia.Migrator do
   """
   alias Ecto.Adapters.Mnesia.Migration
 
+  @type table_copy :: :ram | :disc
+  @type default_copy_opt :: {:default_copy, table_copy()}
+  @type schemas_opt :: [module() | {module(), table_copy()} | {module, Keyword.t()}]
+  @type migrations_opts :: [default_copy_opt() | [schemas_opt()]]
+
   @doc false
-  @spec run(module(), [module()]) :: [module()]
+  @spec run(module(), [Migration.t()]) :: [module()]
   def run(repo, migrations) do
     Enum.reduce(migrations, [], fn {schema, opts}, acc ->
       case create_table(repo, schema, opts) do
@@ -56,6 +61,64 @@ defmodule Ecto.Adapters.Mnesia.Migrator do
 
       {:error, _} = error ->
         error
+    end
+  end
+
+  @doc """
+  Compile migrations configuration into migrations usable by `run/2`
+  """
+  @spec compile(migrations_opts()) :: [Migration.t()]
+  def compile(opts) do
+    default_opts =
+      opts
+      |> Keyword.get(:default_copy, :disc)
+      |> case do
+        :disc -> [disc_copies: [node()], ram_copies: []]
+        :ram -> [disc_copies: [], ram_copies: [node()]]
+      end
+
+    opts
+    |> Keyword.get(:schemas, [])
+    |> Enum.map(fn
+      {schema, storage} when storage in [:ram] ->
+        opts =
+          default_opts
+          |> Keyword.drop([:ram_copies, :disc_copies])
+          |> Keyword.merge(ram_copies: [node()], disc_copies: [])
+
+        {schema, opts}
+
+      {schema, storage} when storage in [:disc] ->
+        opts =
+          default_opts
+          |> Keyword.drop([:ram_copies, :disc_copies])
+          |> Keyword.merge(ram_copies: [], disc_copies: [node()])
+
+        {schema, opts}
+
+      {schema, opts} when is_list(opts) ->
+        {schema, Keyword.merge(default_opts, opts)}
+
+      schema ->
+        {schema, default_opts}
+    end)
+    |> Enum.map(fn {schema, opts} ->
+      _ = ensure_schema!(schema)
+      {schema, opts}
+    end)
+  end
+
+  defp ensure_schema!(schema) do
+    case Code.ensure_compiled(schema) do
+      {:module, _} ->
+        if function_exported?(schema, :__schema__, 2) do
+          schema
+        else
+          Mix.raise("Module #{inspect(schema)} is not an Ecto.Schema.")
+        end
+
+      {:error, error} ->
+        Mix.raise("Could not load #{inspect(schema)}, error: #{inspect(error)}.")
     end
   end
 
