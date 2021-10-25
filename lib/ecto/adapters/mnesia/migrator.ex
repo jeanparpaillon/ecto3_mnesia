@@ -2,6 +2,8 @@ defmodule Ecto.Adapters.Mnesia.Migrator do
   @moduledoc """
   Lower level API for managing migrations
   """
+  require Logger
+
   alias Ecto.Adapters.Mnesia.Migration
 
   @type table_copy :: :ram | :disc
@@ -15,14 +17,16 @@ defmodule Ecto.Adapters.Mnesia.Migrator do
     Enum.reduce(migrations, [], fn {schema, opts}, acc ->
       case create_table(repo, schema, opts) do
         {:ok, table} ->
-          Mix.shell().info("Creates DB table #{table}")
+          Logger.info("Creates DB table #{table}")
           [schema | acc]
 
         {:ignore, table} ->
-          Mix.shell().info("DB table already exists #{table}")
+          Logger.info("DB table already exists #{table}")
+          acc
 
         {:error, error} ->
-          Mix.raise("Coud not create DB table for #{schema}, error: #{inspect(error)}")
+          Logger.error("Coud not create DB table for #{schema}, error: #{inspect(error)}")
+          raise "Error running migrations"
       end
     end)
   end
