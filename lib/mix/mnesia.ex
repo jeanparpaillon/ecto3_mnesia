@@ -2,6 +2,7 @@ defmodule Mix.Mnesia do
   @moduledoc """
   Helpers functions for Mnesia tasks
   """
+  alias Ecto.Adapters.Mnesia.Migrator
 
   @doc """
   Ensures the given module is an Ecto.Repo.
@@ -64,7 +65,7 @@ defmodule Mix.Mnesia do
 
       app
       |> Application.get_env(:ecto_migrations, [])
-      |> normalize_migration()
+      |> Migrator.compile()
     end)
     |> Enum.uniq()
   end
@@ -123,59 +124,5 @@ defmodule Mix.Mnesia do
 
   defp parse_repo([], acc) do
     Enum.reverse(acc)
-  end
-
-  defp normalize_migration(kw) do
-    default_opts =
-      kw
-      |> Keyword.get(:default_copy, :disc)
-      |> case do
-        :disc -> [disc_copies: [node()], ram_copies: []]
-        :ram -> [disc_copies: [], ram_copies: [node()]]
-      end
-
-    kw
-    |> Keyword.get(:schemas, [])
-    |> Enum.map(fn
-      {schema, storage} when storage in [:ram] ->
-        opts =
-          default_opts
-          |> Keyword.drop([:ram_copies, :disc_copies])
-          |> Keyword.merge(ram_copies: [node()], disc_copies: [])
-
-        {schema, opts}
-
-      {schema, storage} when storage in [:disc] ->
-          opts =
-            default_opts
-            |> Keyword.drop([:ram_copies, :disc_copies])
-            |> Keyword.merge(ram_copies: [], disc_copies: [node()])
-
-          {schema, opts}
-
-        {schema, opts} when is_list(opts) ->
-        {schema, Keyword.merge(default_opts, opts)}
-
-      schema ->
-        {schema, default_opts}
-    end)
-    |> Enum.map(fn {schema, opts} ->
-      _ = ensure_schema!(schema)
-      {schema, opts}
-    end)
-  end
-
-  defp ensure_schema!(schema) do
-    case Code.ensure_compiled(schema) do
-      {:module, _} ->
-        if function_exported?(schema, :__schema__, 2) do
-          schema
-        else
-          Mix.raise("Module #{inspect(schema)} is not an Ecto.Schema.")
-        end
-
-      {:error, error} ->
-        Mix.raise("Could not load #{inspect(schema)}, error: #{inspect(error)}.")
-    end
   end
 end
