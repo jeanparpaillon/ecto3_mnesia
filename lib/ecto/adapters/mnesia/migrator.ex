@@ -107,7 +107,11 @@ defmodule Ecto.Adapters.Mnesia.Migrator do
         {schema, default_opts}
     end)
     |> Enum.map(fn {schema, opts} ->
-      _ = ensure_schema!(schema)
+      _ =
+        schema
+        |> ensure_schema!()
+        |> ensure_source!()
+
       {schema, opts}
     end)
   end
@@ -123,6 +127,18 @@ defmodule Ecto.Adapters.Mnesia.Migrator do
 
       {:error, error} ->
         Mix.raise("Could not load #{inspect(schema)}, error: #{inspect(error)}.")
+    end
+  end
+
+  defp ensure_source!(schema) do
+    case schema.__schema__(:source) do
+      nil ->
+        Mix.raise(
+          "Module #{inspect(schema)} do not define a `:source`, probably an embedded schema."
+        )
+
+      _ ->
+        schema
     end
   end
 
