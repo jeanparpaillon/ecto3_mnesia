@@ -129,7 +129,11 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter
   def init(config \\ []) do
-    set_mnesia_env(config)
+    _dir = set_mnesia_env(config)
+
+    if storage_status(config) == :down do
+      raise "Mnesia storage is down. Please run `mix ecto.create`"
+    end
 
     {:ok, Connection.child_spec(config), %{}}
   end
@@ -672,11 +676,13 @@ defmodule Ecto.Adapters.Mnesia do
 
   defp set_mnesia_env(options) do
     if options[:path] do
+      path = options[:path]
       :mnesia.stop()
-      Application.put_env(:mnesia, :dir, '#{options[:path]}', persistent: true)
+      Application.put_env(:mnesia, :dir, '#{path}', persistent: true)
       :mnesia.start()
+      path
     else
-      :ok
+      to_string(Application.get_env(:mnesia, :dir, ''))
     end
   end
 end
