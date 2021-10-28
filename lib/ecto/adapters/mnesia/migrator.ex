@@ -17,7 +17,7 @@ defmodule Ecto.Adapters.Mnesia.Migrator do
   @spec run(module(), [Migration.t()], options()) :: [module()]
   def run(repo, migrations, options \\ []) do
     repo.checkout(fn ->
-      tables = do_run_migrations(repo, migrations, options)
+      tables = do_run_migrations(repo, migrations)
 
       if Keyword.get(options, :sync, false) do
         Connection.add_waited_schemas(tables)
@@ -112,7 +112,7 @@ defmodule Ecto.Adapters.Mnesia.Migrator do
     end)
   end
 
-  defp do_run_migrations(repo, migrations, options) do
+  defp do_run_migrations(repo, migrations) do
     Enum.reduce(migrations, [], fn {schema, opts}, acc ->
       case create_table(repo, schema, opts) do
         {:ok, table} ->
