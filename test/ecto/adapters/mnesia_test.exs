@@ -13,8 +13,13 @@ defmodule Ecto.Adapters.MnesiaAdapterIntegrationTest do
   end
 
   setup do
-    ExUnit.CaptureLog.capture_log(fn -> Mnesia.storage_up(nodes: [node()]) end)
+    ExUnit.CaptureLog.capture_log(fn -> Mnesia.storage_up([]) end)
     Mnesia.ensure_all_started([], :permanent)
+
+    on_exit(fn ->
+      Mnesia.storage_down([])
+    end)
+
     :ok
   end
 

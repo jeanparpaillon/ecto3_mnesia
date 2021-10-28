@@ -11,19 +11,21 @@ defmodule Ecto.Adapters.Mnesia.RepoCase do
   end
 
   setup_all do
-    ExUnit.CaptureLog.capture_log(fn ->
-      :ok = Mnesia.storage_down(nodes: [node()])
+    options = %{path: "./mnesia.test"}
 
-      case Mnesia.storage_up(nodes: [node()]) do
+    ExUnit.CaptureLog.capture_log(fn ->
+      case Mnesia.storage_up(options) do
         :ok -> :ok
         {:error, :already_up} -> :ok
       end
     end)
 
-    Mnesia.ensure_all_started([], :permanent)
-
     {:ok, _repo} = EctoMnesia.TestRepo.start_link()
 
-    :ok
+    on_exit fn ->
+      Mnesia.storage_down(options)
+    end
+
+    %{options: options}
   end
 end

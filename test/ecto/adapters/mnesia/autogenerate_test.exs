@@ -20,10 +20,6 @@ defmodule Ecto.Adapters.Mnesia.AutogenerateTest do
   setup_all do
     :ok = Mnesia.Migration.sync_create_table(Repo, TestSchema)
 
-    on_exit(fn ->
-      :mnesia.clear_table(@table_name)
-    end)
-
     []
   end
 

@@ -66,6 +66,8 @@ defmodule Ecto.Adapters.MnesiaAssociationsIntegrationTest do
     |> Enum.each(fn schema ->
       :ok = Mnesia.Migration.sync_create_table(TestRepo, schema, ram_copies: [node()])
     end)
+
+    []
   end
 
   test "preload has_many association" do
@@ -83,9 +85,6 @@ defmodule Ecto.Adapters.MnesiaAssociationsIntegrationTest do
       _ ->
         assert false
     end
-
-    :mnesia.clear_table(@has_many_table_name)
-    :mnesia.clear_table(@belongs_to_table_name)
   end
 
   test "preload belongs_to association" do
@@ -103,9 +102,6 @@ defmodule Ecto.Adapters.MnesiaAssociationsIntegrationTest do
       _ ->
         assert false
     end
-
-    :mnesia.clear_table(@has_many_table_name)
-    :mnesia.clear_table(@belongs_to_table_name)
   end
 
   @tag :skip

@@ -2,7 +2,6 @@ defmodule Ecto.Adapters.Mnesia.Migration do
   @moduledoc """
   Functions for dealing with schema migrations
   """
-  alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Constraint
   alias Ecto.Adapters.Mnesia.Source
 
@@ -48,17 +47,16 @@ defmodule Ecto.Adapters.Mnesia.Migration do
   @spec create_table(module(), module(), create_opts()) ::
           {:ok, table()} | :ignore | {:error, term()}
   def create_table(repo, schema, opts \\ []) when is_list(opts) do
-    ensure_db_dir!(repo)
-    ensure_schema(repo)
+    repo.checkout(fn ->
+      source = Source.new(%{schema: schema})
+      opts = build_options(source, opts)
 
-    source = Source.new(%{schema: schema})
-    opts = build_options(source, opts)
-
-    case :mnesia.create_table(source.table, opts) do
-      {:atomic, :ok} -> {:ok, source.table}
-      {:aborted, {:already_exists, _}} -> :ignore
-      {:aborted, error} -> {:error, error}
-    end
+      case :mnesia.create_table(source.table, opts) do
+        {:atomic, :ok} -> {:ok, source.table}
+        {:aborted, {:already_exists, _}} -> :ignore
+        {:aborted, error} -> {:error, error}
+      end
+    end)
   end
 
   @doc """
@@ -90,17 +88,19 @@ defmodule Ecto.Adapters.Mnesia.Migration do
 
   Returns ok if table has been deleted or did not exist
   """
-  @spec drop_table(module()) :: :ok | {:error, term()}
-  def drop_table(schema) do
-    %{table: table} = Source.new(%{schema: schema})
+  @spec drop_table(module(), module()) :: :ok | {:error, term()}
+  def drop_table(repo, schema) do
+    repo.checkout(fn ->
+      %{table: table} = Source.new(%{schema: schema})
 
-    table
-    |> :mnesia.delete_table()
-    |> case do
-      {:atomic, :ok} -> :ok
-      {:aborted, {:no_exists, ^table}} -> :ok
-      {:aborted, reason} -> {:error, reason}
-    end
+      table
+      |> :mnesia.delete_table()
+      |> case do
+        {:atomic, :ok} -> :ok
+        {:aborted, {:no_exists, ^table}} -> :ok
+        {:aborted, reason} -> {:error, reason}
+      end
+    end)
   end
 
   @doc """
@@ -158,34 +158,6 @@ defmodule Ecto.Adapters.Mnesia.Migration do
       :ok -> :ok
       {:error, reason} -> {:error, reason}
       {:timeout, [table]} -> {:error, {:timeout, table}}
-    end
-  end
-
-  defp ensure_db_dir!(repo) do
-    repo_dir = repo.config()[:path]
-
-    repo_dir =
-      if repo_dir do
-        Path.expand(repo_dir)
-      else
-        nil
-      end
-
-    mnesia_dir = :mnesia |> Application.get_env(:dir) |> to_string() |> Path.expand()
-
-    if repo_dir && mnesia_dir != repo_dir do
-      raise "Repo #{inspect(repo)} path is set to: #{repo_dir}. " <>
-              "mnesia dir is set to: #{mnesia_dir}. " <>
-              "Ensure Repo is started before calling `create_table`"
-    end
-  end
-
-  defp ensure_schema(repo) do
-    nodes = repo.config()[:nodes] || [node()]
-
-    with id_seq when id_seq in [:ok, :already_exists] <- Connection.ensure_id_seq_table(nodes),
-         cons when cons in [:ok, :alread_exists] <- Connection.ensure_constraints_table(nodes) do
-      :ok
     end
   end
 end

@@ -69,7 +69,7 @@ defmodule Ecto.Adapters.Mnesia.Constraint do
         :mnesia.wait_for_tables([@table], 1_000)
 
       {:aborted, {:already_exists, @table}} ->
-        :ok
+        :mnesia.wait_for_tables([@table], 1_000)
     end
   end
 end
