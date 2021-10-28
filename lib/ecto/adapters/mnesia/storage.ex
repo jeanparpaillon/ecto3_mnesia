@@ -35,7 +35,7 @@ defmodule Ecto.Adapters.Mnesia.Storage do
         :ok
     else
       {:status, :up} -> {:error, :already_up}
-      {:create, {:error, :already_exists}} -> {:error, {:create, :already_exists}}
+      {step, {:error, reason}} -> {:error, {step, reason}}
     end
   end
 
