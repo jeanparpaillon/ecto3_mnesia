@@ -4,30 +4,26 @@ defmodule Ecto.Adapters.Mnesia.Migrator do
   """
   require Logger
 
+  alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Migration
 
   @type table_copy :: :ram | :disc
   @type default_copy_opt :: {:default_copy, table_copy()}
   @type schemas_opt :: [module() | {module(), table_copy()} | {module, Keyword.t()}]
   @type migrations_opts :: [default_copy_opt() | [schemas_opt()]]
+  @type options :: [{:sync, boolean()}]
 
   @doc false
-  @spec run(module(), [Migration.t()]) :: [module()]
-  def run(repo, migrations) do
-    Enum.reduce(migrations, [], fn {schema, opts}, acc ->
-      case create_table(repo, schema, opts) do
-        {:ok, table} ->
-          Logger.info("Creates DB table #{table}")
-          [schema | acc]
+  @spec run(module(), [Migration.t()], options()) :: [module()]
+  def run(repo, migrations, options \\ []) do
+    repo.checkout(fn ->
+      tables = do_run_migrations(repo, migrations, options)
 
-        {:ignore, table} ->
-          Logger.info("DB table already exists #{table}")
-          [schema | acc]
-
-        {:error, error} ->
-          Logger.error("Coud not create DB table for #{schema}, error: #{inspect(error)}")
-          raise "Error running migrations"
+      if Keyword.get(options, :sync, false) do
+        Connection.add_waited_schemas(tables)
       end
+
+      tables
     end)
   end
 
@@ -113,6 +109,24 @@ defmodule Ecto.Adapters.Mnesia.Migrator do
         |> ensure_source!()
 
       {schema, opts}
+    end)
+  end
+
+  defp do_run_migrations(repo, migrations, options) do
+    Enum.reduce(migrations, [], fn {schema, opts}, acc ->
+      case create_table(repo, schema, opts) do
+        {:ok, table} ->
+          Logger.info("Creates DB table #{table}")
+          [schema | acc]
+
+        {:ignore, table} ->
+          Logger.info("DB table already exists #{table}")
+          [schema | acc]
+
+        {:error, error} ->
+          Logger.error("Coud not create DB table for #{schema}, error: #{inspect(error)}")
+          raise "Error running migrations"
+      end
     end)
   end
 
