@@ -102,10 +102,13 @@ defmodule Ecto.Adapters.Mnesia do
   import Ecto.Query
 
   alias Ecto.Adapters.Mnesia
+  alias Ecto.Adapters.Mnesia.Config
   alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Constraint
+  alias Ecto.Adapters.Mnesia.Query
   alias Ecto.Adapters.Mnesia.Record
   alias Ecto.Adapters.Mnesia.Source
+  alias Ecto.Adapters.Mnesia.Storage
   alias Ecto.Adapters.Mnesia.Type
 
   require Logger
@@ -114,28 +117,41 @@ defmodule Ecto.Adapters.Mnesia do
   defmacro __before_compile__(_env), do: true
 
   @impl Ecto.Adapter
-  def checkout(_adapter_meta, _config, function) do
-    function.()
+  def checkout(meta, _options, function) do
+    :ok = Connection.wait_for_storage(meta)
+    Process.put({__MODULE__, :checkout}, true)
+
+    ret = function.()
+
+    Process.delete({__MODULE__, :checkout})
+    ret
   end
 
   @impl Ecto.Adapter
-  def checked_out?(_adapter_meta), do: true
-
-  @impl Ecto.Adapter
-  def ensure_all_started(_config, _type) do
-    {:ok, _} = Application.ensure_all_started(:mnesia)
-    {:ok, []}
+  def checked_out?(_adapter_meta) do
+    Process.get({__MODULE__, :checkout}, false)
   end
 
   @impl Ecto.Adapter
-  def init(config \\ []) do
-    _dir = set_mnesia_env(config)
+  def ensure_all_started(options, _type) do
+    config = Config.new(options)
 
-    if storage_status(config) == :down do
+    if config.restart_mnesia do
+      :mnesia.stop()
+    end
+
+    Application.ensure_all_started(:mnesia)
+  end
+
+  @impl Ecto.Adapter
+  def init(options \\ []) do
+    config = Config.new(options)
+
+    if Storage.status(config) == :down do
       raise "Mnesia storage is down. Please run `mix ecto.create`"
     end
 
-    {:ok, Connection.child_spec(config), %{}}
+    {:ok, Connection.child_spec(config), config}
   end
 
   @impl Ecto.Adapter
@@ -173,8 +189,8 @@ defmodule Ecto.Adapters.Mnesia do
   def loaders(_primitive, type), do: [type]
 
   @impl Ecto.Adapter.Queryable
-  def prepare(type, query) do
-    q = Connection.all(type, query)
+  def prepare(type, %Ecto.Query{} = query) do
+    q = Query.from_ecto_query(type, query)
     {q.cache, q}
   end
 
@@ -241,7 +257,9 @@ defmodule Ecto.Adapters.Mnesia do
 
       {time, {:aborted, {:invalid, constraints}}} ->
         Logger.debug(
-          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert db=#{time}µs #{inspect(constraints)}"
+          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert db=#{time}µs #{
+            inspect(constraints)
+          }"
         )
 
         {:invalid, constraints}
@@ -305,7 +323,9 @@ defmodule Ecto.Adapters.Mnesia do
 
       {time, {:aborted, {:invalid, constraints}}} ->
         Logger.debug(
-          "QUERY ERROR source=#{inspect(source.table)} type=update db=#{time}µs #{inspect(constraints)}"
+          "QUERY ERROR source=#{inspect(source.table)} type=update db=#{time}µs #{
+            inspect(constraints)
+          }"
         )
 
         {:invalid, constraints}
@@ -349,7 +369,9 @@ defmodule Ecto.Adapters.Mnesia do
 
       {time, {:aborted, constraints}} ->
         Logger.debug(
-          "QUERY ERROR source=#{inspect(source.table)} type=delete db=#{time}µs #{inspect(constraints)}"
+          "QUERY ERROR source=#{inspect(source.table)} type=delete db=#{time}µs #{
+            inspect(constraints)
+          }"
         )
 
         {:invalid, constraints}
@@ -377,56 +399,13 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   @impl Ecto.Adapter.Storage
-  def storage_up(options) do
-    nodes = options[:nodes] || [node()]
-
-    set_mnesia_env(options)
-
-    ret =
-      if storage_status(options) == :down do
-        :mnesia.stop()
-
-        ret =
-          case :mnesia.create_schema(nodes) do
-            :ok -> :ok
-            {:error, :already_exists} -> {:error, :already_up}
-          end
-
-        :ok = :mnesia.start()
-
-        ret
-      else
-        {:error, :already_up}
-      end
-
-    with :ok <- :mnesia.start(),
-         id_seq when id_seq in [:ok, :already_exists] <- Connection.ensure_id_seq_table(nodes),
-         cons when cons in [:ok, :alread_exists] <- Connection.ensure_constraints_table(nodes) do
-      ret
-    end
-  end
+  defdelegate storage_up(config), to: Storage, as: :up
 
   @impl Ecto.Adapter.Storage
-  def storage_down(options) do
-    :mnesia.stop()
-
-    set_mnesia_env(options)
-
-    case :mnesia.delete_schema(options[:nodes] || [node()]) do
-      :ok ->
-        :mnesia.start()
-    end
-  end
+  defdelegate storage_down(config), to: Storage, as: :down
 
   @impl Ecto.Adapter.Storage
-  def storage_status(_options) do
-    path = List.to_string(:mnesia.system_info(:directory)) <> "/schema.DAT"
-
-    case File.exists?(path) do
-      true -> :up
-      false -> :down
-    end
-  end
+  defdelegate storage_status(config), to: Storage, as: :status
 
   ###
   ### Priv
@@ -455,7 +434,9 @@ defmodule Ecto.Adapters.Mnesia do
 
       {time, {:aborted, {:invalid, constraints}}} ->
         Logger.debug(
-          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert_all db=#{time}µs #{inspect(constraints)}"
+          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert_all db=#{time}µs #{
+            inspect(constraints)
+          }"
         )
 
         {0, nil}
@@ -516,14 +497,18 @@ defmodule Ecto.Adapters.Mnesia do
          end) do
       {time, {:atomic, result}} ->
         Logger.debug(
-          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{time}µs"
+          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{
+            time
+          }µs"
         )
 
         {:ok, {length(result), result}}
 
       {time, {:aborted, error}} ->
         Logger.debug(
-          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{time}µs #{inspect(error)}"
+          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{
+            time
+          }µs #{inspect(error)}"
         )
 
         {:ok, {0, nil}}
@@ -553,7 +538,9 @@ defmodule Ecto.Adapters.Mnesia do
          end) do
       {time, {:atomic, records}} ->
         Logger.debug(
-          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{time}µs"
+          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{
+            time
+          }µs"
         )
 
         result =
@@ -566,7 +553,9 @@ defmodule Ecto.Adapters.Mnesia do
 
       {time, {:aborted, error}} ->
         Logger.debug(
-          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{time}µs #{inspect(error)}"
+          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{
+            time
+          }µs #{inspect(error)}"
         )
 
         {:ok, {0, nil}}
@@ -673,16 +662,4 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   defp tc_tx(fun), do: :timer.tc(:mnesia, :transaction, [fun])
-
-  defp set_mnesia_env(options) do
-    if options[:path] do
-      path = options[:path]
-      :mnesia.stop()
-      Application.put_env(:mnesia, :dir, '#{path}', persistent: true)
-      :mnesia.start()
-      path
-    else
-      to_string(Application.get_env(:mnesia, :dir, ''))
-    end
-  end
 end

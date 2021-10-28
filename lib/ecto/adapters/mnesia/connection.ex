@@ -2,16 +2,20 @@ defmodule Ecto.Adapters.Mnesia.Connection do
   @moduledoc false
   use GenServer
 
-  alias Ecto.Adapters.Mnesia
-  alias Ecto.Adapters.Mnesia.Connection
-  alias Ecto.Adapters.Mnesia.Constraint
   alias Ecto.Adapters.Mnesia.Source
+  alias Ecto.Adapters.Mnesia.Storage
 
   @id_seq_table_name :mnesia_id_seq
-  @sources_tid Module.concat([__MODULE__, :Sources])
+  @sources_tid Module.concat([__MODULE__, "Sources"])
+  @checkout_tid Module.concat([__MODULE__, "Checkout"])
+
+  defmodule State do
+    @moduledoc false
+    defstruct storage_ref: nil, storage_up: false, config: nil, sources: nil, checkout: nil
+  end
 
   def start_link(config) do
-    Connection
+    __MODULE__
     |> GenServer.start_link([config], name: __MODULE__)
     |> case do
       {:ok, pid} -> {:ok, pid}
@@ -20,13 +24,22 @@ defmodule Ecto.Adapters.Mnesia.Connection do
     end
   end
 
+  def wait_for_storage(%{timeout: timeout}),
+    do: GenServer.call(__MODULE__, :checkout, timeout)
+
   def source(schema),
     do: GenServer.call(__MODULE__, {:source, schema})
 
   @impl GenServer
   def init(config) do
     sources = :ets.new(@sources_tid, [])
-    {:ok, %{config: config, sources: sources}}
+    checkout = :ets.new(@checkout_tid, [:bag])
+    conn = self()
+    ref = make_ref()
+
+    spawn(fn -> wait_for_storage(conn, ref) end)
+
+    {:ok, %State{config: config, sources: sources, storage_ref: ref, checkout: checkout}}
   end
 
   @impl GenServer
@@ -46,6 +59,28 @@ defmodule Ecto.Adapters.Mnesia.Connection do
     {:reply, source, s}
   end
 
+  def handle_call(:checkout, _from, %State{storage_up: true} = s) do
+    {:reply, :ok, s}
+  end
+
+  def handle_call(:checkout, from, %State{checkout: checkout} = s) do
+    :ets.insert(checkout, {:checkout, from})
+    {:noreply, s}
+  end
+
+  @impl GenServer
+  def handle_info({:storage_up, ref}, %State{storage_ref: ref, checkout: checkout} = s) do
+    checkout
+    |> :ets.lookup(:checkout)
+    |> Enum.each(fn {:checkout, from} ->
+      GenServer.reply(from, :ok)
+    end)
+
+    :ets.delete(checkout)
+
+    {:noreply, %{s | storage_ref: nil, storage_up: true, checkout: nil}}
+  end
+
   @impl GenServer
   def terminate(_reason, state) do
     try do
@@ -60,35 +95,8 @@ defmodule Ecto.Adapters.Mnesia.Connection do
 
   def id_seq(source), do: {@id_seq_table_name, source}
 
-  def all(type, %Ecto.Query{} = query) do
-    Mnesia.Query.from_ecto_query(type, query)
-  end
-
-  def ensure_id_seq_table(nil) do
-    ensure_id_seq_table([node()])
-  end
-
-  def ensure_id_seq_table(nodes) when is_list(nodes) do
-    case :mnesia.create_table(@id_seq_table_name,
-           disc_copies: nodes,
-           attributes: [:id, :seq],
-           type: :set,
-           storage_properties: [dets: [auto_save: 5_000]],
-           load_order: 100
-         ) do
-      {:atomic, :ok} ->
-        :mnesia.wait_for_tables([@id_seq_table_name], 1_000)
-
-      {:aborted, {:already_exists, @id_seq_table_name}} ->
-        :ok
-    end
-  end
-
-  def ensure_constraints_table(nil) do
-    ensure_constraints_table([node()])
-  end
-
-  def ensure_constraints_table(nodes) when is_list(nodes) do
-    Constraint.ensure_table(nodes)
+  defp wait_for_storage(conn, ref) do
+    :ok = Storage.wait_for_tables(:infinity)
+    send(conn, {:storage_up, ref})
   end
 end

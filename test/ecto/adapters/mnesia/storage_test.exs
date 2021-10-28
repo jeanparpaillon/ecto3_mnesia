@@ -1,94 +1,56 @@
 defmodule Ecto.Adapters.Mnesia.StorageIntegrationTest do
-  use ExUnit.Case, async: false
+  use Ecto.Adapters.Mnesia.RepoCase
 
   alias Ecto.Adapters.Mnesia
 
   describe "#storage_up" do
-    setup do
-      nodes = [node()]
-
+    test "should write mnesia files", %{options: options} do
       ExUnit.CaptureLog.capture_log(fn ->
-        :mnesia.stop()
-        :mnesia.delete_schema(nodes)
-        :mnesia.start()
-      end)
-
-      {:ok, nodes: nodes}
-    end
-
-    test "should write mnesia files", %{nodes: nodes} do
-      ExUnit.CaptureLog.capture_log(fn ->
-        assert Mnesia.storage_up(nodes: nodes) == :ok
-        {:ok, %File.Stat{ctime: created}} = File.stat("./Mnesia.nonode@nohost/schema.DAT")
-        {:ok, created} = NaiveDateTime.from_erl(created)
-        assert created == NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+        assert Mnesia.storage_up(options) == :ok
+        assert File.exists?("./#{options.path}/schema.DAT")
       end)
     end
 
-    test "should return an error if already up", %{nodes: nodes} do
+    test "should return an error if already up", %{options: options} do
       ExUnit.CaptureLog.capture_log(fn ->
-        Mnesia.storage_up(nodes: nodes)
-        assert Mnesia.storage_up(nodes) == {:error, :already_up}
+        Mnesia.storage_up(options)
+        assert Mnesia.storage_up(options) == {:error, :already_up}
       end)
     end
   end
 
   describe "#storage_down" do
-    setup do
-      nodes = [node()]
-
+    test "should down storage if up", %{options: options} do
       ExUnit.CaptureLog.capture_log(fn ->
-        :mnesia.stop()
-        :mnesia.create_schema(nodes)
-        :mnesia.start()
-      end)
-
-      {:ok, nodes: nodes}
-    end
-
-    test "should down storage if up", %{nodes: nodes} do
-      ExUnit.CaptureLog.capture_log(fn ->
-        assert Mnesia.storage_down(nodes: nodes) == :ok
-
-        refute File.exists?("./Mnesia.nonode@nohost/schema.DAT")
+        assert Mnesia.storage_down(options) == :ok
+        refute File.exists?("./#{options.path}/schema.DAT")
       end)
     end
 
-    test "WARNING : storage_down stil returns :ok if already down", %{nodes: nodes} do
+    test "storage_down returns :ok if already down", %{options: options} do
       ExUnit.CaptureLog.capture_log(fn ->
-        Mnesia.storage_down(nodes: nodes)
-        assert Mnesia.storage_down(nodes: nodes) == :ok
-
-        assert File.exists?("./Mnesia.nonode@nohost")
+        Mnesia.storage_down(options)
+        assert Mnesia.storage_down(options) == :ok
+        refute File.exists?(options.path)
       end)
     end
   end
 
   describe "#storage_status (gives information only about the current node)" do
-    setup do
-      nodes = [node()]
-
-      {:ok, nodes: nodes}
-    end
-
-    test "should be down if storage down", %{nodes: nodes} do
+    test "should be down if storage down", %{options: options} do
       ExUnit.CaptureLog.capture_log(fn ->
-        :mnesia.stop()
-        :mnesia.delete_schema(nodes)
-        :mnesia.start()
+        Mnesia.storage_down(options)
       end)
 
-      assert Mnesia.storage_status([]) == :down
+      assert Mnesia.storage_status(options) == :down
     end
 
-    test "should be up if started", %{nodes: nodes} do
+    test "should be up if started", %{options: options} do
       ExUnit.CaptureLog.capture_log(fn ->
-        :mnesia.stop()
-        :mnesia.create_schema(nodes)
-        :mnesia.start()
+        Mnesia.storage_up(options)
       end)
 
-      assert Mnesia.storage_status([]) == :up
+      assert Mnesia.storage_status(options) == :up
     end
   end
 end
