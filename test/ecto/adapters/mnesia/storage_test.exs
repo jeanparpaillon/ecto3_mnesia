@@ -1,7 +1,18 @@
 defmodule Ecto.Adapters.Mnesia.StorageIntegrationTest do
-  use Ecto.Adapters.Mnesia.RepoCase
+  use ExUnit.Case
 
   alias Ecto.Adapters.Mnesia
+
+  setup do
+    tmp_dir = "./mnesia.test.#{:erlang.phash2(make_ref())}"
+    options = %{path: tmp_dir}
+
+    on_exit fn ->
+      Mnesia.storage_down(options)
+    end
+
+    %{options: options}
+  end
 
   describe "#storage_up" do
     test "should write mnesia files", %{options: options} do
