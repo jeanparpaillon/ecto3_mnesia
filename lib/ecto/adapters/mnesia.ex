@@ -116,7 +116,6 @@ defmodule Ecto.Adapters.Mnesia do
   @impl Ecto.Adapter
   defmacro __before_compile__(_env), do: []
 
-
   @impl Ecto.Adapter
   def checkout(meta, _options, function) do
     :ok = Connection.checkout(meta)
@@ -135,11 +134,10 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter
   def ensure_all_started(options, _type) do
-    config = Config.new(options)
-
-    if config.restart_mnesia do
-      :mnesia.stop()
-    end
+    _config =
+      options
+      |> Config.new()
+      |> Config.ensure_mnesia_config()
 
     Application.ensure_all_started(:mnesia)
   end
