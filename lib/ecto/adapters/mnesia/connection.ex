@@ -11,7 +11,12 @@ defmodule Ecto.Adapters.Mnesia.Connection do
 
   defmodule State do
     @moduledoc false
-    defstruct storage_ref: nil, storage_up: false, config: nil, sources: nil, checkout: nil
+    defstruct storage_ref: nil,
+              storage_up: false,
+              config: nil,
+              sources: nil,
+              checkout: nil,
+              tables: []
   end
 
   def start_link(config) do
@@ -24,7 +29,10 @@ defmodule Ecto.Adapters.Mnesia.Connection do
     end
   end
 
-  def wait_for_storage(%{timeout: timeout}),
+  def add_waited_schemas(schemas),
+    do: GenServer.cast(__MODULE__, {:wait_for, schemas})
+
+  def checkout(%{timeout: timeout}),
     do: GenServer.call(__MODULE__, :checkout, timeout)
 
   def source(schema),
@@ -34,12 +42,9 @@ defmodule Ecto.Adapters.Mnesia.Connection do
   def init(config) do
     sources = :ets.new(@sources_tid, [])
     checkout = :ets.new(@checkout_tid, [:bag])
-    conn = self()
-    ref = make_ref()
+    state = wait_for_storage(%State{config: config, sources: sources, checkout: checkout})
 
-    spawn(fn -> wait_for_storage(conn, ref) end)
-
-    {:ok, %State{config: config, sources: sources, storage_ref: ref, checkout: checkout}}
+    {:ok, state}
   end
 
   @impl GenServer
@@ -65,6 +70,21 @@ defmodule Ecto.Adapters.Mnesia.Connection do
 
   def handle_call(:checkout, from, %State{checkout: checkout} = s) do
     :ets.insert(checkout, {:checkout, from})
+    {:noreply, s}
+  end
+
+  @impl GenServer
+  def handle_cast({:wait_for, schemas}, %State{} = s) do
+    tables =
+      schemas
+      |> Enum.reduce([], fn schema, acc ->
+        case apply(schema, :__schema__, [:source]) do
+          nil -> acc
+          source -> [source | acc]
+        end
+      end)
+
+    s = wait_for_storage(%{s | tables: s.tables ++ tables})
     {:noreply, s}
   end
 
@@ -95,8 +115,22 @@ defmodule Ecto.Adapters.Mnesia.Connection do
 
   def id_seq(source), do: {@id_seq_table_name, source}
 
-  defp wait_for_storage(conn, ref) do
-    :ok = Storage.wait_for_tables(:infinity)
+  defp wait_for_storage(%State{storage_ref: nil} = s) do
+    conn = self()
+    ref = make_ref()
+
+    spawn(fn -> wait_for_storage_task([], conn, ref) end)
+
+    %{s | storage_ref: ref, storage_up: false}
+  end
+
+  defp wait_for_storage(%State{storage_ref: ref} = s) do
+    Task.shutdown(ref)
+    wait_for_storage(%{s | storage_ref: nil})
+  end
+
+  defp wait_for_storage_task(tables, conn, ref) do
+    :ok = Storage.wait_for_tables(tables, :infinity)
     send(conn, {:storage_up, ref})
   end
 end

@@ -114,11 +114,23 @@ defmodule Ecto.Adapters.Mnesia do
   require Logger
 
   @impl Ecto.Adapter
-  defmacro __before_compile__(_env), do: true
+  defmacro __before_compile__(_env) do
+    quote do
+      def wait_for_schemas(schemas) do
+        Ecto.Adapters.Mnesia.Connection.add_waited_schemas(schemas)
+      end
+    end
+  end
+
+  @doc """
+  Add schemas to the list of schemas to be waited for before Connection can be
+  checked out
+  """
+  defdelegate add_waited_schemas(schemas), to: Connection
 
   @impl Ecto.Adapter
   def checkout(meta, _options, function) do
-    :ok = Connection.wait_for_storage(meta)
+    :ok = Connection.checkout(meta)
     Process.put({__MODULE__, :checkout}, true)
 
     ret = function.()

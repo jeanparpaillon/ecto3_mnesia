@@ -39,8 +39,8 @@ defmodule Ecto.Adapters.Mnesia.Storage do
     end
   end
 
-  def wait_for_tables(timeout) do
-    :mnesia.wait_for_tables([@id_seq_table_name, @constraints_table], timeout)
+  def wait_for_tables(tables, timeout) do
+    :mnesia.wait_for_tables([@id_seq_table_name, @constraints_table] ++ tables, timeout)
   end
 
   ###

@@ -22,7 +22,7 @@ defmodule Ecto.Adapters.Mnesia.Migrator do
 
         {:ignore, table} ->
           Logger.info("DB table already exists #{table}")
-          acc
+          [schema | acc]
 
         {:error, error} ->
           Logger.error("Coud not create DB table for #{schema}, error: #{inspect(error)}")
