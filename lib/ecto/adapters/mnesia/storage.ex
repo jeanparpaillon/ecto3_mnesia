@@ -27,12 +27,15 @@ defmodule Ecto.Adapters.Mnesia.Storage do
   end
 
   def up(options) do
-    config = Config.new(options)
+    config =
+      options
+      |> Config.new()
+      |> Config.ensure_mnesia_config()
 
     with {:status, :down} <- {:status, status(config)},
          {:stop, :ok} <- {:stop, ensure_stop_mnesia()},
          {:create, :ok} <- {:create, create_schema(config)} do
-        :ok
+      :ok
     else
       {:status, :up} -> {:error, :already_up}
       {step, {:error, reason}} -> {:error, {step, reason}}
@@ -40,7 +43,8 @@ defmodule Ecto.Adapters.Mnesia.Storage do
   end
 
   def wait_for_tables(tables, timeout) do
-    :mnesia.wait_for_tables([@id_seq_table_name, @constraints_table] ++ tables, timeout)
+    tables = [@id_seq_table_name, @constraints_table] ++ tables
+    :mnesia.wait_for_tables(tables, timeout)
   end
 
   ###

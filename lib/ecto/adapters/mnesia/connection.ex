@@ -2,6 +2,7 @@ defmodule Ecto.Adapters.Mnesia.Connection do
   @moduledoc false
   use GenServer
 
+  alias Ecto.Adapters.Mnesia.Config
   alias Ecto.Adapters.Mnesia.Source
   alias Ecto.Adapters.Mnesia.Storage
 
@@ -21,7 +22,7 @@ defmodule Ecto.Adapters.Mnesia.Connection do
 
   def start_link(config) do
     __MODULE__
-    |> GenServer.start_link([config], name: __MODULE__)
+    |> GenServer.start_link(config, name: __MODULE__)
     |> case do
       {:ok, pid} -> {:ok, pid}
       {:error, {:already_started, pid}} -> {:ok, pid}
@@ -40,6 +41,8 @@ defmodule Ecto.Adapters.Mnesia.Connection do
 
   @impl GenServer
   def init(config) do
+    config = Config.ensure_mnesia_config(config)
+
     sources = :ets.new(@sources_tid, [])
     checkout = :ets.new(@checkout_tid, [:bag])
     state = wait_for_storage(%State{config: config, sources: sources, checkout: checkout})
@@ -96,9 +99,9 @@ defmodule Ecto.Adapters.Mnesia.Connection do
       GenServer.reply(from, :ok)
     end)
 
-    :ets.delete(checkout)
+    :ets.delete_all_objects(checkout)
 
-    {:noreply, %{s | storage_ref: nil, storage_up: true, checkout: nil}}
+    {:noreply, %{s | storage_ref: nil, storage_up: true}}
   end
 
   @impl GenServer
@@ -119,7 +122,7 @@ defmodule Ecto.Adapters.Mnesia.Connection do
     conn = self()
     ref = make_ref()
 
-    spawn(fn -> wait_for_storage_task([], conn, ref) end)
+    spawn(fn -> wait_for_storage_task(s.tables, conn, ref) end)
 
     %{s | storage_ref: ref, storage_up: false}
   end
