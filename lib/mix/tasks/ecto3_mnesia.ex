@@ -1,10 +1,6 @@
-defmodule DummyRepo do
-  use Ecto.Repo,
-    otp_app: :ecto3_mnesia,
-    adapter: Ecto.Adapters.Mnesia
-end
-
 defmodule Mix.Tasks.Ecto3Mnesia do
+  @moduledoc false
+
   defp start_mnesia(repos) do
     Application.ensure_all_started(:ecto3_mnesia)
     Enum.each(repos, & &1.start_link())

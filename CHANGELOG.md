@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [tbd]
 
-### Fixes
+### 0.3.0
 
 * Startup sequence: ensure `:mnesia.stop` is not called when starting
   `Ecto.Repo`
@@ -18,8 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Add
 
 * Support for foreign key constraints
+* Support for primary key unique constraints
+* Support for nothing, replace `on_conflict` settings
+* Ability to set custom Mnesia table name
 * Helpers for creating mnesia tables from schema
 * Support multiple primary keys
+* Migration utilities
+
+### Changes
+
+* Use Mnesia `read` for queries against primary key
 
 ## [0.2.2]
 

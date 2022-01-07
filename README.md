@@ -1,5 +1,6 @@
 [![pipeline status](https://gitlab.com/patatoid/ecto3_mnesia/badges/master/pipeline.svg)](https://gitlab.com/patatoid/ecto3_mnesia/-/commits/master)
 [![coverage report](https://gitlab.com/patatoid/ecto3_mnesia/badges/master/coverage.svg)](https://gitlab.com/patatoid/ecto3_mnesia/-/commits/master)
+
 # Ecto Mnesia Adapter
 This adapter brings the strength of Ecto providing validation, and persistance layer to interact to Mnesia databases.
 
@@ -94,6 +95,7 @@ end
 - Ecto 3.6 has introduced the possibility to send `placeholders` when using
   `Repo.insert_all` (see https://github.com/elixir-ecto/ecto_sql/pull/290).
   `placeholders` are not supported yet.
+- This adapter is based mostly on erlang QLC, the bring quite a lot of overhead to queries and have performance issues.
 
 ## Tests
 You can run the tests as any mix package running
