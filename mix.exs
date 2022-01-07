@@ -5,7 +5,7 @@ defmodule EctoMnesia.MixProject do
     [
       name: "Ecto3 Mnesia",
       app: :ecto3_mnesia,
-      version: "0.2.2",
+      version: "0.3.0",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -16,7 +16,7 @@ defmodule EctoMnesia.MixProject do
       description: description(),
       package: package(),
       docs: [
-        main: "Ecto.Adapters.Mnesia",
+        main: "readme",
         extras: ["README.md"]
       ],
       elixirc_paths: elixirc_paths(Mix.env()),

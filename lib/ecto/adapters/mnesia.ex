@@ -1,6 +1,6 @@
 defmodule Ecto.Adapters.Mnesia do
   @moduledoc """
-  Please find the adapter documentation in [README](README.md)
+  Please find the adapter documentation in the [README](README.md)
   """
 
   # @dialyzer :no_return
