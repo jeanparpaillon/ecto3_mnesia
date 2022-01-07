@@ -4,7 +4,7 @@
 # Ecto Mnesia Adapter
 This adapter brings the strength of Ecto providing validation, and persistance layer to interact to Mnesia databases.
 
-Mnesia is Distributed Database Management System shipped with Erlang runtime. Be aware of strengths and weaknesses listed in [erlang documentation](https://erlang.org/doc/man/mnesia.html) before thinking about using it.
+Mnesia is Distributed Database Management System shipped with Erlang runtime. Be aware of strengths and weaknesses listed in [erlang documentation](https://erlang.org/doc/man/mnesia.html) and read the [known issues](#known-issues) to be sure the solution is adapted for your use case.
 
 
 ## What works
