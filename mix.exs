@@ -16,8 +16,11 @@ defmodule EctoMnesia.MixProject do
       description: description(),
       package: package(),
       docs: [
-        main: "Ecto.Adapters.Mnesia",
-        extras: ["README.md"]
+        main: "readme",
+        extras: [
+          "README.md",
+          "guides/migrate_to_03.md"
+        ]
       ],
       elixirc_paths: elixirc_paths(Mix.env()),
       consolidate_protocols: Mix.env() != :test,

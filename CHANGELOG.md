@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Use Mnesia `read` for queries against primary key
 * `:id_seq_table` is renamed to `:mnesia_id_seq`
 * Ecto timestamps and other `DateTime` fields are now dumped to UNIX, manual migration is needed there
+* Constraints are now managed by a `:mnesia_constraints` table which is to be created
 
 ## [0.2.2]
 
