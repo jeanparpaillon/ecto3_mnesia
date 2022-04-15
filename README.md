@@ -97,6 +97,10 @@ end
   `placeholders` are not supported yet.
 - This adapter is based mostly on erlang QLC, the bring quite a lot of overhead to queries and have performance issues.
 
+## Migrate to 0.3
+
+You can follow [these steps](guides/migrate_to_03.md) to migrate from 0.2 to 0.3 version as it provides some breaking changes.
+
 ## Tests
 You can run the tests as any mix package running
 ```
