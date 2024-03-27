@@ -469,10 +469,8 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      case TestRepo.delete_all(TestSchema) do
-        {count, nil} ->
-          assert count == 3
-      end
+      {count, nil} = TestRepo.delete_all(TestSchema)
+      assert count == 3
 
       :mnesia.clear_table(@table_name)
     end
@@ -515,17 +513,12 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      case TestRepo.delete_all(from(s in TestSchema, where: s.id == 1 or s.id == 2)) do
-        {count, nil} ->
-          assert count == 2
+      assert {2, nil} = TestRepo.delete_all(from(s in TestSchema, where: s.id == 1 or s.id == 2))
 
-          case :mnesia.transaction(fn ->
+      assert {:atomic, [{_, 3, "field 3"}]} =
+               :mnesia.transaction(fn ->
                  :mnesia.foldl(fn record, acc -> [record | acc] end, [], @table_name)
-               end) do
-            {:atomic, [{_, 3, "field 3"}]} -> assert true
-            _ -> assert false
-          end
-      end
+               end)
 
       :mnesia.clear_table(@table_name)
     end
@@ -568,13 +561,8 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      case TestRepo.all(from(s in TestSchema, order_by: [desc: :id, desc: :field])) do
-        [%{id: 2, field: "field 2"}, %{id: 1, field: "field 2"}, %{id: 3, field: "field 2"}] ->
-          assert true
-
-        e ->
-          assert e == false
-      end
+      assert [%{id: 2, field: "field 2"}, %{id: 1, field: "field 2"}, %{id: 3, field: "field 2"}] =
+               TestRepo.all(from(s in TestSchema, order_by: [desc: :id, desc: :field]))
 
       :mnesia.clear_table(@table_name)
     end
@@ -593,10 +581,8 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      case TestRepo.all(from(s in TestSchema, limit: 2)) do
-        [%{id: 1, field: "field 1"}, %{id: 2, field: "field 2"}] -> assert true
-        e -> assert e == false
-      end
+      assert [%{id: 1, field: "field 1"}, %{id: 2, field: "field 2"}] =
+               TestRepo.all(from(s in TestSchema, limit: 2))
 
       :mnesia.clear_table(@table_name)
     end
@@ -617,10 +603,8 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
 
       limit = 2
 
-      case TestRepo.all(from(s in TestSchema, limit: ^limit)) do
-        [%{id: 1, field: "field 1"}, %{id: 2, field: "field 2"}] -> assert true
-        e -> assert e == false
-      end
+      assert [%{id: 1, field: "field 1"}, %{id: 2, field: "field 2"}] =
+               TestRepo.all(from(s in TestSchema, limit: ^limit))
 
       :mnesia.clear_table(@table_name)
     end
@@ -639,10 +623,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      case TestRepo.all(from(s in TestSchema, offset: 2)) do
-        [%{id: 3, field: "field 3"}] -> assert true
-        e -> assert e == false
-      end
+      assert [%{id: 3, field: "field 3"}] = TestRepo.all(from(s in TestSchema, offset: 2))
 
       :mnesia.clear_table(@table_name)
     end
@@ -662,11 +643,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         end)
 
       offset = 2
-
-      case TestRepo.all(from(s in TestSchema, offset: ^offset)) do
-        [%{id: 3, field: "field 3"}] -> assert true
-        e -> assert e == false
-      end
+      assert [%{id: 3, field: "field 3"}] = TestRepo.all(from(s in TestSchema, offset: ^offset))
 
       :mnesia.clear_table(@table_name)
     end
@@ -685,10 +662,8 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      case TestRepo.all(from(s in TestSchema, limit: 1, offset: 1)) do
-        [%{id: 2, field: "field 2"}] -> assert true
-        e -> assert e == false
-      end
+      assert [%{id: 2, field: "field 2"}] =
+               TestRepo.all(from(s in TestSchema, limit: 1, offset: 1))
 
       :mnesia.clear_table(@table_name)
     end

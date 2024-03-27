@@ -1,5 +1,6 @@
 defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   alias Ecto.Query.QueryExpr
+
   @moduledoc """
   Builds qlc query out of Ecto.Query
   """
