@@ -211,9 +211,9 @@ defmodule Ecto.Adapters.Mnesia do
       end
     end
 
-    with {selectTime, {:atomic, [attributes]}} <-
+    with {select_time, {:atomic, [attributes]}} <-
            tc_tx(select_fun),
-         {updateTime, {:atomic, update}} <-
+         {update_time, {:atomic, update}} <-
            tc_tx(fn ->
              try do
                do_update(attributes, params, source)
@@ -225,7 +225,7 @@ defmodule Ecto.Adapters.Mnesia do
       result = Record.select(update, returning, source)
 
       Logger.debug(
-        "QUERY OK source=#{inspect(source.table)} type=update db=#{selectTime + updateTime}µs"
+        "QUERY OK source=#{inspect(source.table)} type=update db=#{select_time + update_time}µs"
       )
 
       {:ok, result}
@@ -262,14 +262,14 @@ defmodule Ecto.Adapters.Mnesia do
       end
     end
 
-    with {selectTime, {:atomic, [[id | _t]]}} <-
+    with {select_time, {:atomic, [[id | _t]]}} <-
            tc_tx(select_fun),
-         {deleteTime, {:atomic, :ok}} <-
+         {delete_time, {:atomic, :ok}} <-
            tc_tx(fn ->
              :mnesia.delete(source.table, id, :write)
            end) do
       Logger.debug(
-        "QUERY OK source=#{inspect(source.table)} type=delete db=#{selectTime + deleteTime}µs"
+        "QUERY OK source=#{inspect(source.table)} type=delete db=#{select_time + delete_time}µs"
       )
 
       {:ok, []}
@@ -407,14 +407,14 @@ defmodule Ecto.Adapters.Mnesia do
          end) do
       {time, {:atomic, result}} ->
         Logger.debug(
-          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{time}µs"
+          "QUERY OK sources=#{sources |> Enum.map_join(",", & &1.table)} type=update_all db=#{time}µs"
         )
 
         {:ok, {length(result), result}}
 
       {time, {:aborted, error}} ->
         Logger.debug(
-          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{time}µs #{inspect(error)}"
+          "QUERY ERROR sources=#{sources |> Enum.map_join(",", & &1.table)} type=update_all db=#{time}µs #{inspect(error)}"
         )
 
         {:ok, {0, nil}}
@@ -444,7 +444,7 @@ defmodule Ecto.Adapters.Mnesia do
          end) do
       {time, {:atomic, records}} ->
         Logger.debug(
-          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{time}µs"
+          "QUERY OK sources=#{sources |> Enum.map_join(",", & &1.table)} type=delete_all db=#{time}µs"
         )
 
         result =
@@ -457,7 +457,7 @@ defmodule Ecto.Adapters.Mnesia do
 
       {time, {:aborted, error}} ->
         Logger.debug(
-          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{time}µs #{inspect(error)}"
+          "QUERY ERROR sources=#{sources |> Enum.map_join(",", & &1.table)} type=delete_all db=#{time}µs #{inspect(error)}"
         )
 
         {:ok, {0, nil}}

@@ -41,6 +41,7 @@ defmodule EctoMnesia.MixProject do
   defp deps do
     [
       {:ecto, ">= 3.0.0 and < 3.11.0"},
+      {:credo, ">= 0.0.0"},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       # Benchmarks

@@ -1,4 +1,5 @@
 defmodule Ecto.Adapters.Mnesia.Query.Qlc do
+  alias Ecto.Query.QueryExpr
   @moduledoc """
   Builds qlc query out of Ecto.Query
   """
@@ -18,6 +19,8 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
     asc: :ascending,
     desc: :descending
   }
+
+  @type query_expr :: %QueryExpr{}
 
   def query(select, joins, sources) do
     context = Context.new(sources)
@@ -49,7 +52,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
     end
   end
 
-  @spec answers(limit :: %QueryExpr{} | nil, offset :: %QueryExpr{} | nil) ::
+  @spec answers(limit :: query_expr() | nil, offset :: query_expr() | nil) ::
           (query_handle :: :qlc.query_handle(), context :: Keyword.t() -> list(tuple()))
   def answers(limit, offset) do
     fn query, params ->

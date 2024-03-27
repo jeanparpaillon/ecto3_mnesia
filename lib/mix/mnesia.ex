@@ -12,7 +12,6 @@ defmodule Mix.Mnesia do
     # Do not pass the --force switch used by some tasks downstream
     args = List.delete(args, "--force")
 
-    # TODO: Use only app.config when we depend on Elixir v1.11+.
     if Code.ensure_loaded?(Mix.Tasks.App.Config) do
       Mix.Task.run("app.config", args)
     else
@@ -52,8 +51,6 @@ defmodule Mix.Mnesia do
 
     apps =
       if apps_paths = Mix.Project.apps_paths() do
-        # TODO: Use the proper ordering from Mix.Project.deps_apps
-        # when we depend on Elixir v1.11+.
         apps_paths |> Map.keys() |> Enum.sort()
       else
         [Mix.Project.config()[:app]]
@@ -91,8 +88,6 @@ defmodule Mix.Mnesia do
   defp parse_repo([], []) do
     apps =
       if apps_paths = Mix.Project.apps_paths() do
-        # TODO: Use the proper ordering from Mix.Project.deps_apps
-        # when we depend on Elixir v1.11+.
         apps_paths |> Map.keys() |> Enum.sort()
       else
         [Mix.Project.config()[:app]]
