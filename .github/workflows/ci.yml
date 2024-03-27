@@ -1,0 +1,49 @@
+name: Elixir CI
+
+on:
+    push:
+        branches: [ master ]
+    pull_request:
+        branches: [ master ]
+
+permissions:
+    contents: read
+
+env:
+    MIX_ENV: test
+
+jobs:
+    setup:
+        runs-on: ubuntu-20.04
+        steps:
+        - uses: actions/checkout@v4
+    
+    test:
+        runs-on: ubuntu-20.04
+        needs: [ setup ]
+        steps:
+        - uses: actions/checkout@v4
+        - uses: erlef/setup-elixir@v1
+          with:
+            elixir-version: '1.16.0-otp-26'
+            otp-version: '26.2.1'
+        - uses: actions/cache@v1
+          id: mix-cache
+          with:
+              path: deps
+              key: ${{ runner.os }}-mix-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
+        - if: steps.mix-cache.outputs.cache-hit != 'true'
+          run: mix deps.get
+        - name: Run Tests
+          run: mix test
+
+    credo:
+        runs-on: ubuntu-20.04
+        needs: [ setup ]
+        steps:
+        - uses: actions/checkout@v4
+        - uses: erlef/setup-beam@v1
+          with:
+            elixir-version: '1.16.0-otp-26'
+            otp-version: '26.2.1'
+        - run: mix format --check-formatted

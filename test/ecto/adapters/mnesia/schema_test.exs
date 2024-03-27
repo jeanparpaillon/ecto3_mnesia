@@ -119,7 +119,11 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       MultiplePrimaryKeyTestSchema
     ]
     |> Enum.each(fn schema ->
-      :ok = Mnesia.Migration.sync_create_table(TestRepo, schema, ram_copies: [node()], type: :ordered_set)
+      :ok =
+        Mnesia.Migration.sync_create_table(TestRepo, schema,
+          ram_copies: [node()],
+          type: :ordered_set
+        )
     end)
   end
 

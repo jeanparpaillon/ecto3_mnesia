@@ -44,7 +44,11 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
   setup_all do
     [TestSchema, TestSchema2]
     |> Enum.each(fn schema ->
-      :ok = Mnesia.Migration.sync_create_table(TestRepo, schema, ram_copies: [node()], type: :ordered_set)
+      :ok =
+        Mnesia.Migration.sync_create_table(TestRepo, schema,
+          ram_copies: [node()],
+          type: :ordered_set
+        )
     end)
   end
 

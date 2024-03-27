@@ -31,7 +31,11 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
   end
 
   setup_all do
-    :ok = Mnesia.Migration.sync_create_table(TestRepo, TestSchema, ram_copies: [node()], type: :ordered_set)
+    :ok =
+      Mnesia.Migration.sync_create_table(TestRepo, TestSchema,
+        ram_copies: [node()],
+        type: :ordered_set
+      )
 
     []
   end
@@ -138,7 +142,8 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
   end
 
   defp insert do
-    timestamp = NaiveDateTime.utc_now() |> NaiveDateTime.add(-1000) |> NaiveDateTime.truncate(:second)
+    timestamp =
+      NaiveDateTime.utc_now() |> NaiveDateTime.add(-1000) |> NaiveDateTime.truncate(:second)
 
     %TestSchema{
       field1: "field1",

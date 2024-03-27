@@ -7,9 +7,9 @@ defmodule Ecto.Adapters.Mnesia.StorageIntegrationTest do
     tmp_dir = "./mnesia.test.#{:erlang.phash2(make_ref())}"
     options = %{path: tmp_dir}
 
-    on_exit fn ->
+    on_exit(fn ->
       Mnesia.storage_down(options)
-    end
+    end)
 
     %{options: options}
   end

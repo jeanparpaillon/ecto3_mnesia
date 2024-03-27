@@ -88,12 +88,12 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
       |> qualifiers(filters)
       |> joins(joins)
 
-      binding_vars = Context.bindings(context)
-      extra_bindings = Context.extra_bindings(context)
+    binding_vars = Context.bindings(context)
+    extra_bindings = Context.extra_bindings(context)
 
     pt_bindings =
       binding_vars
-      |> Enum.map(& {&1, nil})
+      |> Enum.map(&{&1, nil})
       |> Kernel.++(extra_bindings)
 
     expr = {:lc, anno(), vars, generators ++ context.joins ++ context.qualifiers}

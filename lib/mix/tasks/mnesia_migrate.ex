@@ -36,7 +36,7 @@ defmodule Mix.Tasks.Mnesia.Migrate do
   @impl Mix.Task
   def run(args) do
     repos = parse_repo(args)
-    {opts, _} = OptionParser.parse! args, strict: @switches, aliases: @aliases
+    {opts, _} = OptionParser.parse!(args, strict: @switches, aliases: @aliases)
 
     # Start ecto_sql explicitly before as we don't need
     # to restart those apps if migrated.
@@ -58,8 +58,11 @@ defmodule Mix.Tasks.Mnesia.Migrate do
       fun = &Migrator.run(&1, migrations)
 
       case Migrator.with_repo(repo, fun, [mode: :temporary] ++ opts) do
-        {:ok, _migrated, _apps} -> :ok
-        {:error, error} -> Mix.raise "Could not start repo #{inspect repo}, error: #{inspect error}"
+        {:ok, _migrated, _apps} ->
+          :ok
+
+        {:error, error} ->
+          Mix.raise("Could not start repo #{inspect(repo)}, error: #{inspect(error)}")
       end
     end
   end

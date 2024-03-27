@@ -13,8 +13,8 @@ defmodule Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest do
   defmodule BelongsToSchema do
     use Ecto.Schema
 
-  @primary_key {:id, :binary_id, autogenerate: true}
-  @foreign_key_type :binary_id
+    @primary_key {:id, :binary_id, autogenerate: true}
+    @foreign_key_type :binary_id
     schema "#{Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest.BelongsTo}" do
       field(:field, :string)
 
@@ -25,12 +25,14 @@ defmodule Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest do
   defmodule HasManySchema do
     use Ecto.Schema
 
-  @primary_key {:id, :binary_id, autogenerate: true}
-  @foreign_key_type :binary_id
+    @primary_key {:id, :binary_id, autogenerate: true}
+    @foreign_key_type :binary_id
     schema "#{Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest.HasMany}" do
       field(:field, :string)
 
-      has_many(:belongs_tos, Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest.BelongsToSchema,
+      has_many(
+        :belongs_tos,
+        Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest.BelongsToSchema,
         foreign_key: :has_many_id
       )
     end
@@ -39,8 +41,8 @@ defmodule Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest do
   defmodule ManyToManySchemaA do
     use Ecto.Schema
 
-  @primary_key {:id, :binary_id, autogenerate: true}
-  @foreign_key_type :binary_id
+    @primary_key {:id, :binary_id, autogenerate: true}
+    @foreign_key_type :binary_id
     schema "#{Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest.ManyToManyA}" do
       field(:field, :string)
 
@@ -56,8 +58,8 @@ defmodule Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest do
   defmodule ManyToManySchemaB do
     use Ecto.Schema
 
-  @primary_key {:id, :binary_id, autogenerate: true}
-  @foreign_key_type :binary_id
+    @primary_key {:id, :binary_id, autogenerate: true}
+    @foreign_key_type :binary_id
     schema "#{Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest.ManyToManyB}" do
       field(:field, :string)
 
@@ -79,6 +81,7 @@ defmodule Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest do
   test "preload has_many association" do
     a = Ecto.UUID.generate()
     b = Ecto.UUID.generate()
+
     :mnesia.transaction(fn ->
       :mnesia.write(@has_many_table_name, {HasManySchema, a, "has many"}, :write)
       :mnesia.write(@has_many_table_name, {HasManySchema, b, "has many"}, :write)
@@ -86,12 +89,14 @@ defmodule Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest do
       :mnesia.write(@belongs_to_table_name, {BelongsToSchema, b, "belongs to", a}, :write)
     end)
 
-    assert %HasManySchema{belongs_tos: belongs_tos} = TestRepo.get(HasManySchema, a) |> TestRepo.preload(:belongs_tos)
+    assert %HasManySchema{belongs_tos: belongs_tos} =
+             TestRepo.get(HasManySchema, a) |> TestRepo.preload(:belongs_tos)
 
     [TestRepo.get(BelongsToSchema, a), TestRepo.get(BelongsToSchema, b)]
     |> Enum.map(fn belongs_to ->
       assert Enum.member?(belongs_tos, belongs_to)
     end)
+
     assert length(belongs_tos) == 2
     :mnesia.clear_table(@has_many_table_name)
     :mnesia.clear_table(@belongs_to_table_name)
@@ -100,6 +105,7 @@ defmodule Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest do
   test "preload belongs_to association" do
     a = Ecto.UUID.generate()
     b = Ecto.UUID.generate()
+
     :mnesia.transaction(fn ->
       :mnesia.write(@has_many_table_name, {HasManySchema, a, "has many"}, :write)
       :mnesia.write(@has_many_table_name, {HasManySchema, b, "has many"}, :write)
@@ -124,6 +130,7 @@ defmodule Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest do
   test "preload many_to_many association" do
     a = Ecto.UUID.generate()
     b = Ecto.UUID.generate()
+
     :mnesia.transaction(fn ->
       :mnesia.write(@many_to_many_a_table_name, {ManyToManySchemaA, a, "many to many A"}, :write)
       :mnesia.write(@many_to_many_a_table_name, {ManyToManySchemaA, b, "many to many A"}, :write)

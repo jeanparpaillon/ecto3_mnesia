@@ -22,9 +22,9 @@ defmodule Ecto.Adapters.Mnesia.RepoCase do
 
     {:ok, _repo} = EctoMnesia.TestRepo.start_link()
 
-    on_exit fn ->
+    on_exit(fn ->
       Mnesia.storage_down(options)
-    end
+    end)
 
     %{options: options}
   end
