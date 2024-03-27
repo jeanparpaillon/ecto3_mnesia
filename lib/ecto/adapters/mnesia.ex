@@ -175,9 +175,7 @@ defmodule Ecto.Adapters.Mnesia do
 
       {time, {:aborted, {:invalid, constraints}}} ->
         Logger.debug(
-          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert db=#{time}µs #{
-            inspect(constraints)
-          }"
+          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert db=#{time}µs #{inspect(constraints)}"
         )
 
         {:invalid, constraints}
@@ -241,9 +239,7 @@ defmodule Ecto.Adapters.Mnesia do
 
       {time, {:aborted, {:invalid, constraints}}} ->
         Logger.debug(
-          "QUERY ERROR source=#{inspect(source.table)} type=update db=#{time}µs #{
-            inspect(constraints)
-          }"
+          "QUERY ERROR source=#{inspect(source.table)} type=update db=#{time}µs #{inspect(constraints)}"
         )
 
         {:invalid, constraints}
@@ -287,9 +283,7 @@ defmodule Ecto.Adapters.Mnesia do
 
       {time, {:aborted, constraints}} ->
         Logger.debug(
-          "QUERY ERROR source=#{inspect(source.table)} type=delete db=#{time}µs #{
-            inspect(constraints)
-          }"
+          "QUERY ERROR source=#{inspect(source.table)} type=delete db=#{time}µs #{inspect(constraints)}"
         )
 
         {:invalid, constraints}
@@ -352,9 +346,7 @@ defmodule Ecto.Adapters.Mnesia do
 
       {time, {:aborted, {:invalid, constraints}}} ->
         Logger.debug(
-          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert_all db=#{time}µs #{
-            inspect(constraints)
-          }"
+          "QUERY ERROR source=#{inspect(schema_meta.source)} type=insert_all db=#{time}µs #{inspect(constraints)}"
         )
 
         {0, nil}
@@ -415,18 +407,14 @@ defmodule Ecto.Adapters.Mnesia do
          end) do
       {time, {:atomic, result}} ->
         Logger.debug(
-          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{
-            time
-          }µs"
+          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{time}µs"
         )
 
         {:ok, {length(result), result}}
 
       {time, {:aborted, error}} ->
         Logger.debug(
-          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{
-            time
-          }µs #{inspect(error)}"
+          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=update_all db=#{time}µs #{inspect(error)}"
         )
 
         {:ok, {0, nil}}
@@ -456,9 +444,7 @@ defmodule Ecto.Adapters.Mnesia do
          end) do
       {time, {:atomic, records}} ->
         Logger.debug(
-          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{
-            time
-          }µs"
+          "QUERY OK sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{time}µs"
         )
 
         result =
@@ -471,9 +457,7 @@ defmodule Ecto.Adapters.Mnesia do
 
       {time, {:aborted, error}} ->
         Logger.debug(
-          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{
-            time
-          }µs #{inspect(error)}"
+          "QUERY ERROR sources=#{sources |> Enum.map(& &1.table) |> Enum.join(",")} type=delete_all db=#{time}µs #{inspect(error)}"
         )
 
         {:ok, {0, nil}}
