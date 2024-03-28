@@ -10,6 +10,7 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
   alias Ecto.Adapters.Mnesia.Query.Qlc.Context
   alias Ecto.Adapters.Mnesia.Source
   alias Ecto.Query.BooleanExpr
+  alias Ecto.Query.LimitExpr
   alias Ecto.Query.QueryExpr
   alias Ecto.Query.SelectExpr
 
@@ -128,7 +129,13 @@ defmodule Ecto.Adapters.Mnesia.Query.Qlc do
     Enum.at(params, param_index)
   end
 
+  defp unbind_limit(%LimitExpr{expr: {:^, [], [param_index]}}, params) do
+    Enum.at(params, param_index)
+  end
+
   defp unbind_limit(%QueryExpr{expr: limit}, _params) when is_integer(limit), do: limit
+
+  defp unbind_limit(%LimitExpr{expr: limit}, _params) when is_integer(limit), do: limit
 
   defp unbind_offset(nil, _context), do: 0
 
