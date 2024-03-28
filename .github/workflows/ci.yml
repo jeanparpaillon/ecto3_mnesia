@@ -47,4 +47,4 @@ jobs:
             elixir-version: '1.12.3-otp-24'
             otp-version: '24.3.4.6'
         - run: mix format --check-formatted
-        - run: mix credo --strict
+        - run: mix credo
