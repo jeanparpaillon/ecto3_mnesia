@@ -25,9 +25,6 @@ ecto3_mnesia-*.tar
 # Mnesia files
 /Mnesia.nonode@nohost
 
-# mix.lock
-mix.lock
-
 # Vim files
 *.swp
 *.swo

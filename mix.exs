@@ -9,9 +9,7 @@ defmodule EctoMnesia.MixProject do
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      dialyzer: [
-        plt_add_apps: [:mnesia, :mix]
-      ],
+      dialyzer: dialyzer(),
       source_url: "https://gitlab.com/patatoid/ecto3_mnesia",
       description: description(),
       package: package(),
@@ -71,6 +69,14 @@ defmodule EctoMnesia.MixProject do
     [
       benchmark: "run benchmarks/get.exs",
       profile: "run benchmarks/prof.exs"
+    ]
+  end
+
+  defp dialyzer do
+    [
+      plt_add_apps: [:mnesia, :mix],
+      plt_core_path: "priv/plts",
+      plt_file: {:no_warn, "priv/plts/dialyzer.plt"}
     ]
   end
 end
