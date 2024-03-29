@@ -3,8 +3,8 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
   require Ecto.Query
 
-  alias EctoMnesia.TestRepo
   alias Ecto.Adapters.Mnesia
+  alias EctoMnesia.TestRepo
 
   @table_name __MODULE__.Table
   @alt_record_table_name __MODULE__.AltRecordTable

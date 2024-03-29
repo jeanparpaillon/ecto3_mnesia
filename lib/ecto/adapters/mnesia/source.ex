@@ -110,7 +110,7 @@ defmodule Ecto.Adapters.Mnesia.Source do
 
   defp record_name(schema) do
     if function_exported?(schema, :__record_name__, 0) do
-      apply(schema, :__record_name__, [])
+      schema.__record_name__()
     else
       schema
     end
@@ -149,8 +149,7 @@ defmodule Ecto.Adapters.Mnesia.Source do
 
   defp build_source_field(%{schema: schema} = source) do
     map =
-      schema
-      |> apply(:__schema__, [:fields])
+      schema.__schema__(:fields)
       |> Enum.reduce(%{}, &Map.put(&2, schema.__schema__(:field_source, &1), &1))
 
     %{source | source_field: map}
@@ -182,8 +181,7 @@ defmodule Ecto.Adapters.Mnesia.Source do
   end
 
   defp schema_sources(schema) do
-    schema
-    |> apply(:__schema__, [:fields])
+    schema.__schema__(:fields)
     |> Enum.map(&schema.__schema__(:field_source, &1))
   end
 end

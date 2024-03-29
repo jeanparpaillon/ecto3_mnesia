@@ -3,8 +3,8 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
 
   import Ecto.Query, only: [from: 2]
 
-  alias EctoMnesia.TestRepo
   alias Ecto.Adapters.Mnesia
+  alias EctoMnesia.TestRepo
 
   @table_name __MODULE__.Table
   @table_name2 __MODULE__.Table2

@@ -1,8 +1,8 @@
 defmodule Ecto.Adapters.Mnesia.AutogenerateTest do
   use Ecto.Adapters.Mnesia.RepoCase, async: false
 
-  alias EctoMnesia.TestRepo, as: Repo
   alias Ecto.Adapters.Mnesia
+  alias EctoMnesia.TestRepo, as: Repo
 
   @table_name __MODULE__.Table
 

@@ -1,10 +1,10 @@
 defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
   use Ecto.Adapters.Mnesia.RepoCase, async: false
 
-  alias EctoMnesia.TestRepo
   alias Ecto.Adapters.Mnesia
   alias Ecto.Changeset
   alias Ecto.Multi
+  alias EctoMnesia.TestRepo
 
   defmodule TestSchema do
     use Ecto.Schema

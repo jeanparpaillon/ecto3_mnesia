@@ -6,12 +6,12 @@ defmodule Ecto.Adapters.Mnesia.Query do
   * `Ecto.Adapters.Mnesia.Query.Get` for simple `Repo.get` -like queries
   * `Ecto.Adapters.Mnesia.Query.Qlc` for more complex ones
   """
-  alias Ecto.Query.BooleanExpr
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Query
   alias Ecto.Adapters.Mnesia.Record
   alias Ecto.Adapters.Mnesia.Source
+  alias Ecto.Query.BooleanExpr
   alias Ecto.Query.QueryExpr
 
   defstruct original: nil,

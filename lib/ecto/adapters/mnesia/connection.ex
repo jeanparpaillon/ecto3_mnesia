@@ -81,7 +81,7 @@ defmodule Ecto.Adapters.Mnesia.Connection do
     tables =
       schemas
       |> Enum.reduce([], fn schema, acc ->
-        case apply(schema, :__schema__, [:source]) do
+        case schema.__schema__(:source) do
           nil -> acc
           source -> [source | acc]
         end
@@ -106,12 +106,10 @@ defmodule Ecto.Adapters.Mnesia.Connection do
 
   @impl GenServer
   def terminate(_reason, state) do
-    try do
-      :dets.sync(@id_seq_table_name)
-      state
-    rescue
-      e -> e
-    end
+    :dets.sync(@id_seq_table_name)
+    state
+  rescue
+    e -> e
   end
 
   def id_seq_table_name, do: @id_seq_table_name

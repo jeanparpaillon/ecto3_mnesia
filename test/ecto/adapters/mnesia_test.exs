@@ -1,8 +1,8 @@
 defmodule Ecto.Adapters.MnesiaAdapterIntegrationTest do
   use ExUnit.Case, async: true
 
-  alias EctoMnesia.TestRepo
   alias Ecto.Adapters.Mnesia
+  alias EctoMnesia.TestRepo
 
   defmodule TestSchema do
     use Ecto.Schema

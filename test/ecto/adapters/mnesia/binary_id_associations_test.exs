@@ -1,8 +1,8 @@
 defmodule Ecto.Adapters.MnesiaBinaryAssociationsIntegrationTest do
   use Ecto.Adapters.Mnesia.RepoCase, async: false
 
-  alias EctoMnesia.TestRepo
   alias Ecto.Adapters.Mnesia
+  alias EctoMnesia.TestRepo
 
   @has_many_table_name __MODULE__.HasMany
   @belongs_to_table_name __MODULE__.BelongsTo

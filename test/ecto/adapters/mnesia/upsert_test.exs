@@ -5,9 +5,9 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
 
   Record.defrecord(:rec, [:id, :field1, :field2, :field3, :inserted_at, :updated_at])
 
-  alias EctoMnesia.TestRepo
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Type
+  alias EctoMnesia.TestRepo
 
   @table_name __MODULE__.Table
 

@@ -8,11 +8,11 @@ defmodule Mix.Tasks.Ecto3Mnesia do
   end
 
   if Mix.env() == :dev do
-    def migration_dir_not_set() do
+    def migration_dir_not_set do
       "./priv/example_mnesia_migrations"
     end
   else
-    def migration_dir_not_set() do
+    def migration_dir_not_set do
       IO.puts(~s(Please set a migration directory in config.exs
           config Ecto3Mnesia,
           mig_dir: "./priv/mnesia_migrations"))
