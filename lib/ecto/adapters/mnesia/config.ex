@@ -21,7 +21,7 @@ defmodule Ecto.Adapters.Mnesia.Config do
     if config.path != mnesia_dir do
       Logger.info("Set mnesia storage directory")
       Application.stop(:mnesia)
-      Application.put_env(:mnesia, :dir, '#{config.path}', persistent: true)
+      Application.put_env(:mnesia, :dir, ~c"#{config.path}", persistent: true)
       {:ok, _} = Application.ensure_all_started(:mnesia)
     end
 
@@ -37,7 +37,7 @@ defmodule Ecto.Adapters.Mnesia.Config do
     default_dir =
       case config do
         %{otp_app: otp_app} -> Application.app_dir(otp_app, "priv/mnesia")
-        _ -> './priv/mnesia'
+        _ -> ~c"./priv/mnesia"
       end
 
     Map.merge(config, %{path: to_string(Application.get_env(:mnesia, :dir, default_dir))})

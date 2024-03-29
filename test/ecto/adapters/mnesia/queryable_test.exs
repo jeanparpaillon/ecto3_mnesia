@@ -176,7 +176,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           Stream.iterate(0, &(&1 + 1))
           |> Enum.take(10_000)
           |> Enum.map(fn id ->
-            :mnesia.write(@table_name2, {TestSchema2, id, 'field #{id}'}, :write)
+            :mnesia.write(@table_name2, {TestSchema2, id, ~c"field #{id}"}, :write)
           end)
         end)
 
