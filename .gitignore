@@ -40,3 +40,6 @@ Mnesia*
 
 # Benchmark output
 /benchmarks/output
+
+# Dialyzer PLTs
+/priv/plts
