@@ -43,3 +43,4 @@ Mnesia*
 
 # Dialyzer PLTs
 /priv/plts
+/priv/mnesia
