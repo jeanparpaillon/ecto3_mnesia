@@ -211,6 +211,27 @@ benchmarks = %{
       exit(1)
     end
   end,
+  "qlc.get.int.id" => fn x ->
+    {:ok, item} =
+      BenchRepo.transaction(fn ->
+        case Qlc.get_int_idx(:test_table, x) do
+          [] ->
+            nil
+
+          [item] ->
+            Ecto.Adapters.Mnesia.Record.to_schema(
+              item,
+              source
+            )
+        end
+      end)
+
+    if item.indexed_field != "field-#{x}" do
+      IO.puts("ERROR, got wrong value")
+      IO.inspect(item)
+      exit(1)
+    end
+  end,
   "ecto.get.string.idx" => fn x ->
     item = BenchRepo.get_by(TestSchema, indexed_field: "field-#{x}")
 
@@ -224,6 +245,27 @@ benchmarks = %{
     {:ok, item} =
       BenchRepo.transaction(fn ->
         case :mnesia.index_read(:test_table, "field-#{x}", :indexed_field) do
+          [] ->
+            nil
+
+          [item] ->
+            Ecto.Adapters.Mnesia.Record.to_schema(
+              item,
+              source
+            )
+        end
+      end)
+
+    if item.indexed_field != "field-#{x}" do
+      IO.puts("ERROR, got wrong value")
+      IO.inspect(item)
+      exit(1)
+    end
+  end,
+  "qlc.get.string.id" => fn x ->
+    {:ok, item} =
+      BenchRepo.transaction(fn ->
+        case Qlc.get_string_idx(:test_table, "field-#{x}") do
           [] ->
             nil
 
@@ -271,7 +313,28 @@ benchmarks = %{
       exit(1)
     end
   end,
-  "ecto.get.string.non.idx" => fn x ->
+  "qlc.get.int.non.id" => fn x ->
+    {:ok, item} =
+      BenchRepo.transaction(fn ->
+        case Qlc.get_int_non_idx(:test_table, x) do
+          [] ->
+            nil
+
+          [item] ->
+            Ecto.Adapters.Mnesia.Record.to_schema(
+              item,
+              source
+            )
+        end
+      end)
+
+    if item.indexed_field != "field-#{x}" do
+      IO.puts("ERROR, got wrong value")
+      IO.inspect(item)
+      exit(1)
+    end
+  end,
+    "ecto.get.string.non.idx" => fn x ->
     item = BenchRepo.get_by(TestSchema, non_indexed_field: "field-#{x}")
 
     if item.indexed_field != "field-#{x}" do
@@ -304,6 +367,27 @@ benchmarks = %{
       IO.inspect(item)
       exit(1)
     end
+  end,
+  "qlc.get.string.non.id" => fn x ->
+    {:ok, item} =
+      BenchRepo.transaction(fn ->
+        case Qlc.get_string_non_idx(:test_table, "field-#{x}") do
+          [] ->
+            nil
+
+          [item] ->
+            Ecto.Adapters.Mnesia.Record.to_schema(
+              item,
+              source
+            )
+        end
+      end)
+
+    if item.indexed_field != "field-#{x}" do
+      IO.puts("ERROR, got wrong value")
+      IO.inspect(item)
+      exit(1)
+    end
   end
 }
 
@@ -312,23 +396,27 @@ benchmarks = %{
 # Execution
 #
 ###########################################################################################
+Logger.info("Setting up database")
 BenchUtils.setup()
+Logger.info("Provisioning database")
 BenchUtils.provision(n)
 # Just for debugging
 # BenchUtils.traverse_table_and_show(:test_table)
 
-Benchee.run(
-  BenchUtils.do_benchmark(
-    benchmarks |> Map.take(["ecto.get.id", "mnesia.get.id", "qlc.get.id"]),
-    indices),
-  time: 10,
-  memory_time: 2,
-  formatters: [
-    Benchee.Formatters.HTML,
-    # {Benchee.Formatters.JSON, file: "output/json/provision.json"},
-    Benchee.Formatters.Console
-  ],
-  before_each: & &1
-)
-
-BenchUtils.cleanup()
+try do
+  Benchee.run(
+    BenchUtils.do_benchmark(
+      benchmarks,
+      indices),
+    time: 10,
+    memory_time: 2,
+    formatters: [
+      Benchee.Formatters.HTML,
+      # {Benchee.Formatters.JSON, file: "output/json/provision.json"},
+      Benchee.Formatters.Console
+    ],
+    before_each: & &1
+  )
+after
+  BenchUtils.cleanup()
+end
