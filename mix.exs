@@ -10,25 +10,26 @@ defmodule EctoMnesia.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       dialyzer: dialyzer(),
-      source_url: "https://gitlab.com/patatoid/ecto3_mnesia",
+      source_url: "https://github.com/jeanparpaillon/ecto3_mnesia",
       description: description(),
       package: package(),
-      docs: [
-        main: "readme",
-        extras: [
-          "README.md",
-          "guides/migrate_to_03.md"
-        ]
-      ],
+      docs: docs(),
       elixirc_paths: elixirc_paths(Mix.env()),
       consolidate_protocols: Mix.env() != :test,
       aliases: aliases()
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
-  defp elixirc_paths(:dev), do: ["lib", "lib_support"]
-  defp elixirc_paths(:prod), do: ["lib"]
+  def cli do
+    [
+      default_env: :dev,
+      preferred_envs: [benchmark: :test]
+    ]
+  end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support", "test/benchmark"]
+  defp elixirc_paths(:dev), do: ["lib", "test/benchmark"]
+  defp elixirc_paths(_), do: ["lib"]
 
   def application do
     [
@@ -40,12 +41,12 @@ defmodule EctoMnesia.MixProject do
     [
       {:ecto, ">= 3.0.0 and < 3.11.0"},
       {:credo, ">= 0.0.0"},
-      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.21", only: [:dev], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       # Benchmarks
-      {:benchee, "~> 1.0", only: :dev},
-      {:benchee_html, "~> 1.0", only: :dev},
-      {:benchee_json, "~> 1.0", only: :dev}
+      {:benchee, "~> 1.0", only: [:dev, :test]},
+      {:benchee_html, "~> 1.0", only: [:dev, :test]},
+      {:benchee_json, "~> 1.0", only: [:dev, :test]}
     ]
   end
 
@@ -65,9 +66,18 @@ defmodule EctoMnesia.MixProject do
     """
   end
 
+  defp docs do
+    [
+      main: "readme",
+      extras: [
+        "README.md",
+        "guides/migrate_to_03.md"
+      ]
+    ]
+  end
+
   defp aliases do
     [
-      benchmark: "run benchmarks/get.exs",
       profile: "run benchmarks/prof.exs"
     ]
   end

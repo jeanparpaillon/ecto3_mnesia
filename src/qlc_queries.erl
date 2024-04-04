@@ -13,7 +13,7 @@ get_int_idx(Table, I) ->
     qlc:e(Handle).
 
 get_string_idx(Table, S) ->
-    Handle = qlc:q([X || X <- mnesia:table(Table), element(4, X) == S ]),
+    Handle = qlc:q([X || X <- mnesia:table(Table), element(5, X) == S ]),
     qlc:e(Handle).
 
 get_int_non_idx(Table, I) ->
