@@ -1,3 +1,4 @@
+# credo:disable-for-this-file
 defmodule Mix.Tasks.Benchmark do
   @moduledoc """
   Run benchmark
@@ -13,7 +14,8 @@ defmodule Mix.Tasks.Benchmark do
   alias Ecto.Adapters.Mnesia.Benchmark.Schema
 
   @default_n 1000
-  @mnesia_dir Path.join(__DIR__, "../../../benchmarks/mnesia") |> Path.expand() |> to_charlist()
+  @base_dir Path.join(__DIR__, "../../../benchmarks") |> Path.expand()
+  @mnesia_dir Path.join(@base_dir, "mnesia") |> to_charlist()
 
   @impl Mix.Task
   def run(args) do
@@ -75,6 +77,8 @@ defmodule Mix.Tasks.Benchmark do
   end
 
   defp setup do
+    File.mkdir_p!(@base_dir)
+
     Application.put_env(:ecto3_mnesia, :ecto_repos, [Repo], persistent: true)
     Application.put_env(:mnesia, :dir, @mnesia_dir, persistent: true)
 

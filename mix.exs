@@ -15,27 +15,26 @@ defmodule EctoMnesia.MixProject do
       package: package(),
       docs: docs(),
       elixirc_paths: elixirc_paths(Mix.env()),
-      consolidate_protocols: Mix.env() != :test,
-      aliases: aliases()
+      consolidate_protocols: Mix.env() != :test
     ]
   end
 
   def cli do
     [
       default_env: :dev,
-      preferred_envs: [benchmark: :test]
+      preferred_envs: [benchmark: :test, profile: :test]
     ]
   end
-
-  defp elixirc_paths(:test), do: ["lib", "test/support", "test/benchmark"]
-  defp elixirc_paths(:dev), do: ["lib", "test/benchmark"]
-  defp elixirc_paths(_), do: ["lib"]
 
   def application do
     [
       extra_applications: [:logger, :mnesia]
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support", "test/benchmark"]
+  defp elixirc_paths(:dev), do: ["lib", "test/benchmark"]
+  defp elixirc_paths(_), do: ["lib"]
 
   defp deps do
     [
@@ -76,17 +75,12 @@ defmodule EctoMnesia.MixProject do
     ]
   end
 
-  defp aliases do
-    [
-      profile: "run benchmarks/prof.exs"
-    ]
-  end
-
   defp dialyzer do
     [
       plt_add_apps: [:mnesia, :mix],
       plt_core_path: "priv/plts",
-      plt_file: {:no_warn, "priv/plts/dialyzer.plt"}
+      plt_file: {:no_warn, "priv/plts/dialyzer.plt"},
+      ignore_warnings: ".dialyzer_ignore.exs"
     ]
   end
 end

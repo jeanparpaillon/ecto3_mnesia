@@ -39,7 +39,10 @@ tags
 Mnesia*
 
 # Benchmark output
-/benchmarks/output
+/benchmarks
+
+# Profiling output
+/profile
 
 # Dialyzer PLTs
 /priv/plts
