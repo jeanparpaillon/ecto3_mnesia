@@ -4,7 +4,6 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
   import Ecto.Query, only: [from: 2]
 
   alias Ecto.Adapters.Mnesia
-  alias EctoMnesia.TestRepo
 
   @table_name __MODULE__.Table
   @table_name2 __MODULE__.Table2
@@ -45,7 +44,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
     [TestSchema, TestSchema2]
     |> Enum.each(fn schema ->
       :ok =
-        Mnesia.Migration.sync_create_table(TestRepo, schema,
+        Mnesia.Migration.sync_create_table(Repo, schema,
           ram_copies: [node()],
           type: :ordered_set
         )
@@ -54,8 +53,8 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
 
   describe "Ecto.Adapter.Queryable#execute" do
     test "#all from one table with no query, no records" do
-      TestRepo.transaction(fn ->
-        assert TestRepo.all(TestSchema) == []
+      Repo.transaction(fn ->
+        assert Repo.all(TestSchema) == []
       end)
     end
 
@@ -72,7 +71,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      case TestRepo.all(TestSchema) do
+      case Repo.all(TestSchema) do
         [] ->
           assert false
 
@@ -104,7 +103,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      assert TestRepo.all(from(s in TestSchema, select: s.id)) ==
+      assert Repo.all(from(s in TestSchema, select: s.id)) ==
                Enum.map(records, fn %{id: id} -> id end)
 
       :mnesia.clear_table(@table_name)
@@ -123,7 +122,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      assert TestRepo.all(from(s in TestSchema, select: [s.id, s.field])) ==
+      assert Repo.all(from(s in TestSchema, select: [s.id, s.field])) ==
                Enum.map(records, fn %{id: id, field: field} -> [id, field] end)
 
       :mnesia.clear_table(@table_name)
@@ -142,7 +141,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      case TestRepo.all(from(s in TestSchema, where: s.id == 1)) do
+      case Repo.all(from(s in TestSchema, where: s.id == 1)) do
         [%{id: 1, field: "field 1"}] -> assert true
         e -> assert e == false
       end
@@ -160,7 +159,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      records = TestRepo.all(from(s in TestSchema, where: s.field == "field 2"))
+      records = Repo.all(from(s in TestSchema, where: s.field == "field 2"))
 
       assert Enum.all?(records, fn
                %{field: "field 2"} -> true
@@ -180,7 +179,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      records = TestRepo.get_by(TestSchema2, field: "field 2")
+      records = Repo.get_by(TestSchema2, field: "field 2")
 
       assert %{field: "field 2"} = records
 
@@ -200,7 +199,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      records = TestRepo.all(from(s in TestSchema, where: s.field == "field 2" and s.id == 2))
+      records = Repo.all(from(s in TestSchema, where: s.field == "field 2" and s.id == 2))
       refute Enum.empty?(records)
 
       assert Enum.all?(records, fn
@@ -224,7 +223,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      records = TestRepo.all(from(s in TestSchema, where: s.field == "field 2" or s.id == 1))
+      records = Repo.all(from(s in TestSchema, where: s.field == "field 2" or s.id == 1))
       refute Enum.empty?(records)
 
       assert Enum.all?(records, fn
@@ -250,7 +249,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         end)
 
       records =
-        TestRepo.all(
+        Repo.all(
           from(s in TestSchema,
             where: (s.field == "field 2" and s.id == 2) or (s.field == "field 1" and s.id == 1)
           )
@@ -280,7 +279,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      records = TestRepo.all(from(s in TestSchema, where: is_nil(s.field)))
+      records = Repo.all(from(s in TestSchema, where: is_nil(s.field)))
 
       assert Enum.all?(records, fn
                %{field: nil} -> true
@@ -306,7 +305,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      records = TestRepo.all(from(s in TestSchema, where: s.field == ^field and s.id == ^id))
+      records = Repo.all(from(s in TestSchema, where: s.field == ^field and s.id == ^id))
 
       assert Enum.all?(records, fn
                %{field: ^field} -> true
@@ -330,7 +329,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      case TestRepo.all(from(s in TestSchema, where: s.id in [1, 3])) do
+      case Repo.all(from(s in TestSchema, where: s.id in [1, 3])) do
         [
           %TestSchema{id: 1, field: "field 1"},
           %TestSchema{id: 3, field: "field 3"}
@@ -358,7 +357,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      case TestRepo.all(from(s in TestSchema, where: s.id != 2)) do
+      case Repo.all(from(s in TestSchema, where: s.id != 2)) do
         [
           %TestSchema{id: 1, field: "field 1"},
           %TestSchema{id: 3, field: "field 3"}
@@ -389,7 +388,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ids = [1, 3]
       id = 1
 
-      case TestRepo.all(from(s in TestSchema, where: s.id == ^id or s.id in ^ids)) do
+      case Repo.all(from(s in TestSchema, where: s.id == ^id or s.id in ^ids)) do
         [
           %TestSchema{id: 1, field: "field 1"},
           %TestSchema{id: 3, field: "field 3"}
@@ -416,10 +415,10 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      assert [record] = TestRepo.all(from(s in TestSchema, where: not is_nil(s.field)))
+      assert [record] = Repo.all(from(s in TestSchema, where: not is_nil(s.field)))
       assert record.id == 2
 
-      assert [record] = TestRepo.all(from(s in TestSchema, where: s.id not in ^[2, 3]))
+      assert [record] = Repo.all(from(s in TestSchema, where: s.id not in ^[2, 3]))
       assert record.id == 1
 
       :mnesia.clear_table(@table_name)
@@ -440,7 +439,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         end)
 
       {count, records} =
-        TestRepo.update_all(
+        Repo.update_all(
           from(s in TestSchema, where: s.id == 1 or s.id == 2),
           set: [field: "updated field"]
         )
@@ -469,7 +468,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      {count, nil} = TestRepo.delete_all(TestSchema)
+      {count, nil} = Repo.delete_all(TestSchema)
       assert count == 3
 
       :mnesia.clear_table(@table_name)
@@ -489,7 +488,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      ret = TestRepo.delete_all(from(t in TestSchema, select: t.id))
+      ret = Repo.delete_all(from(t in TestSchema, select: t.id))
       assert {3, [1, 2, 3]} = ret
 
       for i <- 1..3 do
@@ -513,7 +512,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      assert {2, nil} = TestRepo.delete_all(from(s in TestSchema, where: s.id == 1 or s.id == 2))
+      assert {2, nil} = Repo.delete_all(from(s in TestSchema, where: s.id == 1 or s.id == 2))
 
       assert {:atomic, [{_, 3, "field 3"}]} =
                :mnesia.transaction(fn ->
@@ -537,7 +536,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      ret = TestRepo.all(from(s in TestSchema, order_by: [desc: :field]))
+      ret = Repo.all(from(s in TestSchema, order_by: [desc: :field]))
 
       assert [%{id: 2, field: "field 3"}, %{id: 1, field: "field 2"}, %{id: 3, field: "field 1"}] =
                ret
@@ -562,7 +561,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         end)
 
       assert [%{id: 2, field: "field 2"}, %{id: 1, field: "field 2"}, %{id: 3, field: "field 2"}] =
-               TestRepo.all(from(s in TestSchema, order_by: [desc: :id, desc: :field]))
+               Repo.all(from(s in TestSchema, order_by: [desc: :id, desc: :field]))
 
       :mnesia.clear_table(@table_name)
     end
@@ -582,7 +581,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         end)
 
       assert [%{id: 1, field: "field 1"}, %{id: 2, field: "field 2"}] =
-               TestRepo.all(from(s in TestSchema, limit: 2))
+               Repo.all(from(s in TestSchema, limit: 2))
 
       :mnesia.clear_table(@table_name)
     end
@@ -604,7 +603,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       limit = 2
 
       assert [%{id: 1, field: "field 1"}, %{id: 2, field: "field 2"}] =
-               TestRepo.all(from(s in TestSchema, limit: ^limit))
+               Repo.all(from(s in TestSchema, limit: ^limit))
 
       :mnesia.clear_table(@table_name)
     end
@@ -623,7 +622,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      assert [%{id: 3, field: "field 3"}] = TestRepo.all(from(s in TestSchema, offset: 2))
+      assert [%{id: 3, field: "field 3"}] = Repo.all(from(s in TestSchema, offset: 2))
 
       :mnesia.clear_table(@table_name)
     end
@@ -643,7 +642,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         end)
 
       offset = 2
-      assert [%{id: 3, field: "field 3"}] = TestRepo.all(from(s in TestSchema, offset: ^offset))
+      assert [%{id: 3, field: "field 3"}] = Repo.all(from(s in TestSchema, offset: ^offset))
 
       :mnesia.clear_table(@table_name)
     end
@@ -663,7 +662,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         end)
 
       assert [%{id: 2, field: "field 2"}] =
-               TestRepo.all(from(s in TestSchema, limit: 1, offset: 1))
+               Repo.all(from(s in TestSchema, limit: 1, offset: 1))
 
       :mnesia.clear_table(@table_name)
     end
@@ -682,7 +681,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
         end)
 
-      assert %TestSchema{id: 1, field: "field 1"} = TestRepo.get(TestSchema, 1)
+      assert %TestSchema{id: 1, field: "field 1"} = Repo.get(TestSchema, 1)
 
       :mnesia.clear_table(@table_name)
     end

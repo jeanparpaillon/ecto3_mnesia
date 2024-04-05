@@ -4,7 +4,6 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
   require Ecto.Query
 
   alias Ecto.Adapters.Mnesia
-  alias EctoMnesia.TestRepo
 
   @table_name __MODULE__.Table
   @alt_record_table_name __MODULE__.AltRecordTable
@@ -120,7 +119,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     ]
     |> Enum.each(fn schema ->
       :ok =
-        Mnesia.Migration.sync_create_table(TestRepo, schema,
+        Mnesia.Migration.sync_create_table(Repo, schema,
           ram_copies: [node()],
           type: :ordered_set
         )
@@ -129,7 +128,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
   describe "Ecto.Adapters.Schema#insert" do
     test "Repo#insert valid record" do
-      case TestRepo.insert(%TestSchema{field: "field"}) do
+      case Repo.insert(%TestSchema{field: "field"}) do
         {:ok, %{id: id, field: "field"}} ->
           assert true
 
@@ -149,7 +148,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     end
 
     test "Repo#insert valid record - alt record name" do
-      case TestRepo.insert(%TestSchemaAltRecord{field: "field"}) do
+      case Repo.insert(%TestSchemaAltRecord{field: "field"}) do
         {:ok, %{id: id, field: "field"}} ->
           assert true
 
@@ -179,7 +178,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
         )
       end)
 
-      case TestRepo.insert(%TestSchema{id: id, field: "field"}, on_conflict: :replace_all) do
+      case Repo.insert(%TestSchema{id: id, field: "field"}, on_conflict: :replace_all) do
         {:ok, %{id: id, field: "field"}} ->
           assert true
 
@@ -210,7 +209,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       end)
 
       assert_raise Ecto.ConstraintError, fn ->
-        TestRepo.insert(%TestSchema{id: id, field: "field"}, on_conflict: :raise)
+        Repo.insert(%TestSchema{id: id, field: "field"}, on_conflict: :raise)
       end
 
       :mnesia.clear_table(@table_name)
@@ -228,7 +227,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       end)
 
       assert_raise Ecto.ConstraintError, fn ->
-        TestRepo.insert(%TestSchema{id: id, field: "field"})
+        Repo.insert(%TestSchema{id: id, field: "field"})
       end
 
       :mnesia.clear_table(@table_name)
@@ -237,7 +236,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     test "Repo#insert valid record with array" do
       array = ["a", "b"]
 
-      case TestRepo.insert(%ArrayTestSchema{field: array}) do
+      case Repo.insert(%ArrayTestSchema{field: array}) do
         {:ok, %{id: id}} ->
           assert true
 
@@ -256,7 +255,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     end
 
     test "Repo#insert valid record with binary id" do
-      case TestRepo.insert(%BinaryIdTestSchema{field: "field"}) do
+      case Repo.insert(%BinaryIdTestSchema{field: "field"}) do
         {:ok, %{id: id, field: "field"}} ->
           assert true
 
@@ -278,7 +277,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     end
 
     test "Repo#insert valid record without primary key" do
-      case TestRepo.insert(%WithoutPrimaryKeyTestSchema{field: "field"}) do
+      case Repo.insert(%WithoutPrimaryKeyTestSchema{field: "field"}) do
         {:ok, %{field: field}} ->
           assert true
 
@@ -297,7 +296,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     end
 
     test "Repo#insert valid record with returning opt" do
-      case TestRepo.insert(%TestSchema{field: "field"}, returning: [:id, :field]) do
+      case Repo.insert(%TestSchema{field: "field"}, returning: [:id, :field]) do
         {:ok, %{id: id, field: "field"}} ->
           assert true
 
@@ -318,10 +317,10 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
     test "Repo#insert valid record - multiple primary keys" do
       assert {:ok, _} =
-               TestRepo.insert(%MultiplePrimaryKeyTestSchema{key1: 1, key2: 1, field: "field 1"})
+               Repo.insert(%MultiplePrimaryKeyTestSchema{key1: 1, key2: 1, field: "field 1"})
 
       assert {:ok, _} =
-               TestRepo.insert(%MultiplePrimaryKeyTestSchema{key1: 1, key2: 2, field: "field 2"})
+               Repo.insert(%MultiplePrimaryKeyTestSchema{key1: 1, key2: 2, field: "field 2"})
 
       for i <- [1, 2] do
         ret = :mnesia.dirty_read(@multiple_primary_key_table_name, {1, i})
@@ -334,7 +333,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
   describe "Ecto.Adapters.Schema#insert_all" do
     test "Repo#insert_all valid records" do
-      case TestRepo.insert_all(
+      case Repo.insert_all(
              TestSchema,
              [%{field: "field 1"}, %{field: "field 2"}],
              returning: [:id]
@@ -361,7 +360,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     end
 
     test "Repo#insert_all valid records - alt record name" do
-      case TestRepo.insert_all(
+      case Repo.insert_all(
              TestSchemaAltRecord,
              [%{field: "field 1"}, %{field: "field 2"}],
              returning: [:id]
@@ -388,7 +387,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     end
 
     test "Repo#insert_all valid records with returning opt" do
-      case TestRepo.insert_all(
+      case Repo.insert_all(
              TestSchema,
              [%{field: "field 1"}, %{field: "field 2"}],
              returning: [:id]
@@ -417,7 +416,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     end
 
     test "Repo#insert_all valid records with binary ids returning opt" do
-      case TestRepo.insert_all(
+      case Repo.insert_all(
              BinaryIdTestSchema,
              [%{field: "field 1"}, %{field: "field 2"}],
              returning: [:id, :field]
@@ -441,7 +440,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     end
 
     test "Repo#insert_all valid records without primary key returning opt" do
-      case TestRepo.insert_all(
+      case Repo.insert_all(
              WithoutPrimaryKeyTestSchema,
              [%{field: "field 1"}, %{field: "field 2"}],
              returning: [:field]
@@ -476,7 +475,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
           :mnesia.write(@table_name, {TestSchema, 1, "field", nil, nil}, :write)
         end)
 
-      record = TestRepo.get(TestSchema, 1)
+      record = Repo.get(TestSchema, 1)
 
       {:ok, record: record}
     end
@@ -485,7 +484,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       id = record.id
       changeset = TestSchema.changeset(record, %{field: "field updated"})
 
-      ret = TestRepo.update(changeset)
+      ret = Repo.update(changeset)
       assert {:ok, %TestSchema{id: ^id, field: "field updated"}} = ret
 
       ret = :mnesia.transaction(fn -> :mnesia.read(@table_name, id) end)
@@ -500,13 +499,13 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
           :mnesia.write(@array_table_name, {ArrayTestSchema, 1, ["a", "b"], nil, nil}, :write)
         end)
 
-      record = TestRepo.get(ArrayTestSchema, 1)
+      record = Repo.get(ArrayTestSchema, 1)
 
       id = record.id
       update = ["c", "d"]
       changeset = ArrayTestSchema.changeset(record, %{field: update})
 
-      case TestRepo.update(changeset) do
+      case Repo.update(changeset) do
         {:ok, %ArrayTestSchema{id: ^id, field: ^update}} ->
           case :mnesia.transaction(fn ->
                  :mnesia.read(@array_table_name, id)
@@ -527,7 +526,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       changeset = TestSchema.changeset(%{record | id: 3}, %{field: "field updated"})
 
       assert_raise Ecto.StaleEntryError, fn ->
-        TestRepo.update(changeset)
+        Repo.update(changeset)
       end
 
       :mnesia.clear_table(@table_name)
@@ -541,7 +540,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
           :mnesia.write(@alt_record_table_name, {@alt_record_name, 1, "field"}, :write)
         end)
 
-      record = TestRepo.get(TestSchemaAltRecord, 1)
+      record = Repo.get(TestSchemaAltRecord, 1)
 
       {:ok, record: record}
     end
@@ -550,7 +549,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       id = record.id
       changeset = TestSchemaAltRecord.changeset(record, %{field: "field updated"})
 
-      case TestRepo.update(changeset) do
+      case Repo.update(changeset) do
         {:ok, %TestSchemaAltRecord{id: ^id, field: "field updated"}} ->
           case :mnesia.transaction(fn ->
                  :mnesia.read(@alt_record_table_name, id)
@@ -574,12 +573,12 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
           :mnesia.write(@table_name, {TestSchema, 1, "field", nil, nil}, :write)
         end)
 
-      record = TestRepo.get(TestSchema, 1)
+      record = Repo.get(TestSchema, 1)
       {:ok, record: record}
     end
 
     test "Repo#delete an existing record", %{record: record} do
-      case TestRepo.delete(record) do
+      case Repo.delete(record) do
         {:ok, %TestSchema{id: 1, field: "field"}} ->
           case :mnesia.transaction(fn ->
                  :mnesia.read(@table_name, 1)
@@ -597,7 +596,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
     test "Repo#delete a non existing record", %{record: record} do
       assert_raise Ecto.StaleEntryError, fn ->
-        TestRepo.delete(%{record | id: 2})
+        Repo.delete(%{record | id: 2})
       end
 
       :mnesia.clear_table(@table_name)

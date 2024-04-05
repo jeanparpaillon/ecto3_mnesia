@@ -2,7 +2,6 @@ defmodule Ecto.Adapters.MnesiaAssociationsIntegrationTest do
   use Ecto.Adapters.Mnesia.RepoCase, async: false
 
   alias Ecto.Adapters.Mnesia
-  alias EctoMnesia.TestRepo
 
   @has_many_table_name __MODULE__.HasMany
   @belongs_to_table_name __MODULE__.BelongsTo
@@ -64,7 +63,7 @@ defmodule Ecto.Adapters.MnesiaAssociationsIntegrationTest do
   setup_all do
     [BelongsToSchema, HasManySchema, ManyToManySchemaA, ManyToManySchemaB]
     |> Enum.each(fn schema ->
-      :ok = Mnesia.Migration.sync_create_table(TestRepo, schema, ram_copies: [node()])
+      :ok = Mnesia.Migration.sync_create_table(Repo, schema, ram_copies: [node()])
     end)
 
     []
@@ -78,9 +77,9 @@ defmodule Ecto.Adapters.MnesiaAssociationsIntegrationTest do
       :mnesia.write(@belongs_to_table_name, {BelongsToSchema, 2, "belongs to", 1}, :write)
     end)
 
-    case TestRepo.get(HasManySchema, 1) |> TestRepo.preload(:belongs_tos) do
+    case Repo.get(HasManySchema, 1) |> Repo.preload(:belongs_tos) do
       %HasManySchema{belongs_tos: belongs_tos} ->
-        assert belongs_tos == [TestRepo.get(BelongsToSchema, 1), TestRepo.get(BelongsToSchema, 2)]
+        assert belongs_tos == [Repo.get(BelongsToSchema, 1), Repo.get(BelongsToSchema, 2)]
 
       _ ->
         assert false
@@ -95,9 +94,9 @@ defmodule Ecto.Adapters.MnesiaAssociationsIntegrationTest do
       :mnesia.write(@belongs_to_table_name, {BelongsToSchema, 2, "belongs to", 1}, :write)
     end)
 
-    case TestRepo.get(BelongsToSchema, 1) |> TestRepo.preload(:has_many) do
+    case Repo.get(BelongsToSchema, 1) |> Repo.preload(:has_many) do
       %BelongsToSchema{has_many: has_many} ->
-        assert has_many == TestRepo.get(HasManySchema, 1)
+        assert has_many == Repo.get(HasManySchema, 1)
 
       _ ->
         assert false
@@ -117,11 +116,11 @@ defmodule Ecto.Adapters.MnesiaAssociationsIntegrationTest do
       :mnesia.write(@join_table_name, {@join_table_name, 2, 1}, :write)
     end)
 
-    case TestRepo.get(ManyToManySchemaA, 1) |> TestRepo.preload(:many_to_many_bs) do
+    case Repo.get(ManyToManySchemaA, 1) |> Repo.preload(:many_to_many_bs) do
       %ManyToManySchemaA{many_to_many_bs: many_to_many_bs} ->
         assert many_to_many_bs == [
-                 TestRepo.get(ManyToManySchemaB, 1),
-                 TestRepo.get(ManyToManySchemaB, 2)
+                 Repo.get(ManyToManySchemaB, 1),
+                 Repo.get(ManyToManySchemaB, 2)
                ]
 
       e ->

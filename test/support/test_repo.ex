@@ -1,4 +1,4 @@
-defmodule EctoMnesia.TestRepo do
+defmodule Ecto.Adapters.Mnesia.TestRepo do
   @moduledoc false
   use Ecto.Repo,
     otp_app: :ecto3_mnesia,

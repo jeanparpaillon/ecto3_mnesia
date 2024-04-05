@@ -2,7 +2,7 @@ defmodule Ecto.Adapters.MnesiaAdapterIntegrationTest do
   use ExUnit.Case, async: true
 
   alias Ecto.Adapters.Mnesia
-  alias EctoMnesia.TestRepo
+  alias Ecto.Adapters.Mnesia.TestRepo, as: Repo
 
   defmodule TestSchema do
     use Ecto.Schema
@@ -25,7 +25,7 @@ defmodule Ecto.Adapters.MnesiaAdapterIntegrationTest do
 
   describe "Ecto.Adapter#init" do
     test "#start_link" do
-      {:ok, repo} = TestRepo.start_link()
+      {:ok, repo} = Repo.start_link()
 
       assert Process.alive?(repo)
     end

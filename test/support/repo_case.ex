@@ -3,10 +3,11 @@ defmodule Ecto.Adapters.Mnesia.RepoCase do
   use ExUnit.CaseTemplate
 
   alias Ecto.Adapters.Mnesia
+  alias Ecto.Adapters.Mnesia.TestRepo, as: Repo
 
   using do
     quote do
-      alias EctoMnesia.TestRepo, as: Repo
+      alias Ecto.Adapters.Mnesia.TestRepo, as: Repo
     end
   end
 
@@ -20,7 +21,7 @@ defmodule Ecto.Adapters.Mnesia.RepoCase do
       end
     end)
 
-    {:ok, _repo} = EctoMnesia.TestRepo.start_link()
+    {:ok, _repo} = Repo.start_link()
 
     on_exit(fn ->
       Mnesia.storage_down(options)

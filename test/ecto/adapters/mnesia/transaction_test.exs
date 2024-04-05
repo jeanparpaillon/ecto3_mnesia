@@ -4,7 +4,6 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
   alias Ecto.Adapters.Mnesia
   alias Ecto.Changeset
   alias Ecto.Multi
-  alias EctoMnesia.TestRepo
 
   defmodule TestSchema do
     use Ecto.Schema
@@ -21,10 +20,10 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
   end
 
   setup_all do
-    :ok = Mnesia.Migration.drop_table(TestRepo, TestSchema)
+    :ok = Mnesia.Migration.drop_table(Repo, TestSchema)
 
     :ok =
-      Mnesia.Migration.sync_create_table(TestRepo, TestSchema,
+      Mnesia.Migration.sync_create_table(Repo, TestSchema,
         ram_copies: [node()],
         type: :ordered_set
       )
@@ -35,24 +34,24 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
   describe "Ecto.Adapter.Transaction" do
     test "#transaction should execute" do
       assert {:ok, _} =
-               TestRepo.transaction(fn ->
-                 TestRepo.all(TestSchema)
+               Repo.transaction(fn ->
+                 Repo.all(TestSchema)
                end)
     end
 
     test "#rollback should rollback" do
-      assert TestRepo.transaction(fn ->
-               TestRepo.rollback(:reason)
+      assert Repo.transaction(fn ->
+               Repo.rollback(:reason)
              end) == {:error, :reason}
     end
 
     test "#in_transaction should return false" do
-      assert TestRepo.in_transaction?() == false
+      assert Repo.in_transaction?() == false
     end
 
     test "#in_transaction should return true in transaction" do
-      TestRepo.transaction(fn ->
-        assert TestRepo.in_transaction?() == false
+      Repo.transaction(fn ->
+        assert Repo.in_transaction?() == false
       end)
     end
   end
@@ -69,7 +68,7 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
           end,
           on_conflict: :raise
         )
-        |> TestRepo.transaction()
+        |> Repo.transaction()
 
       assert {:error, :rec2, %Changeset{errors: [id: {"has already been taken", _}]}, %{rec1: _}} =
                ret
@@ -85,7 +84,7 @@ defmodule Ecto.Adapters.MnesiaTransactionIntegrationTest do
         |> Multi.run(:read, fn repo, %{write: %{id: j}} ->
           {:ok, repo.get(TestSchema, j)}
         end)
-        |> TestRepo.transaction()
+        |> Repo.transaction()
       end
 
       1..100

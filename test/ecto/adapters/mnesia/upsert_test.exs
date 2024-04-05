@@ -7,7 +7,6 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
 
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Type
-  alias EctoMnesia.TestRepo
 
   @table_name __MODULE__.Table
 
@@ -32,7 +31,7 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
 
   setup_all do
     :ok =
-      Mnesia.Migration.sync_create_table(TestRepo, TestSchema,
+      Mnesia.Migration.sync_create_table(Repo, TestSchema,
         ram_copies: [node()],
         type: :ordered_set
       )
@@ -45,7 +44,7 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
     {:ok, updated_at_ts} = Type.dump_naive_datetime(updated_at, :second)
 
     assert_raise Ecto.ConstraintError, fn ->
-      TestRepo.insert(%{model | field1: "newfield1"}, on_conflict: :raise)
+      Repo.insert(%{model | field1: "newfield1"}, on_conflict: :raise)
     end
 
     assert [rec(id: ^id, field1: "field1", updated_at: ^updated_at_ts)] =
@@ -57,7 +56,7 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
     {:ok, updated_at_ts} = Type.dump_naive_datetime(updated_at, :second)
 
     assert {:ok, %TestSchema{field1: "newfield1"}} =
-             TestRepo.insert(%{model | field1: "newfield1"}, on_conflict: :nothing)
+             Repo.insert(%{model | field1: "newfield1"}, on_conflict: :nothing)
 
     assert [rec(id: ^id, field1: "field1", updated_at: ^updated_at_ts)] =
              :mnesia.dirty_read(@table_name, id)
@@ -78,7 +77,7 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
 
     assert {:ok,
             %TestSchema{id: ^id, field1: "newfield1", field2: "newfield2", field3: "newfield3"}} =
-             TestRepo.insert(model, on_conflict: :replace_all)
+             Repo.insert(model, on_conflict: :replace_all)
 
     assert [
              rec(
@@ -105,7 +104,7 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
     }
 
     assert {:ok, %TestSchema{id: ^id}} =
-             TestRepo.insert(model, on_conflict: {:replace_all_except, [:field2, :inserted_at]})
+             Repo.insert(model, on_conflict: {:replace_all_except, [:field2, :inserted_at]})
 
     assert [
              rec(
@@ -129,7 +128,7 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
     }
 
     assert {:ok, %TestSchema{id: ^id}} =
-             TestRepo.insert(model, on_conflict: {:replace, [:field2]})
+             Repo.insert(model, on_conflict: {:replace, [:field2]})
 
     assert [
              rec(
@@ -152,6 +151,6 @@ defmodule Ecto.Adapters.Mnesia.UpsertTest do
       inserted_at: timestamp,
       updated_at: timestamp
     }
-    |> TestRepo.insert()
+    |> Repo.insert()
   end
 end
