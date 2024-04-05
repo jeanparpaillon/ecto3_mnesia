@@ -32,6 +32,9 @@ defmodule Ecto.Adapters.Mnesia.Storage do
       |> Config.new()
       |> Config.ensure_mnesia_config()
 
+    # mnesia will fail if mnesia dir parent is missing
+    File.mkdir_p!(Path.join(config.path, "..") |> Path.expand())
+
     with {:status, :down} <- {:status, status(config)},
          {:stop, :ok} <- {:stop, ensure_stop_mnesia()},
          {:create, :ok} <- {:create, create_schema(config)},
