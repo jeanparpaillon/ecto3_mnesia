@@ -34,7 +34,8 @@ defmodule Ecto.Adapters.Mnesia.Storage do
 
     with {:status, :down} <- {:status, status(config)},
          {:stop, :ok} <- {:stop, ensure_stop_mnesia()},
-         {:create, :ok} <- {:create, create_schema(config)} do
+         {:create, :ok} <- {:create, create_schema(config)},
+         {:wait, :ok} <- {:wait, wait_for_tables([], 1000)} do
       :ok
     else
       {:status, :up} -> {:error, :already_up}
